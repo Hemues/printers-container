@@ -45,7 +45,7 @@ export class DownloadsService {
           this.done.clear();
           for (const j of list) {
             const key = this.keyFor(j);
-            this.done.set(key, this.toDownload(j));
+            this.done.set(key, this.toDownload(j as unknown as Partial<Download> & Record<string, unknown>));
           }
           this.doneChanged.next(null);
         } catch { /* ignore */ }
@@ -68,7 +68,7 @@ export class DownloadsService {
     return {
       ...(job as Download),
       url: (job['printer'] as string) || (job.url ?? ''),
-      title: (job['title'] as string) || (job.name ?? ''),
+      title: (job['title'] as string) || ((job['name'] as string) ?? ''),
       checked: false,
       deleting: false,
     } as Download;
