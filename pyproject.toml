@@ -1,0 +1,16 @@
+[project]
+name = "printers"
+version = "0.1.0"
+description = "Self-hosted print server (CUPS + Samba) with per-user shadow PDF archive and web admin UI"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp",
+    "python-socketio>=5.0,<6.0",
+    "pyotp",
+    "qrcode[pil]",
+]
+
+[dependency-groups]
+dev = [
+    "pylint",
+]

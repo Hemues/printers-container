@@ -1,0 +1,37 @@
+#!/bin/bash
+# /etc/scripts/podman-printers-updater-inside-pod
+# Run as root. Pulls the latest printers image and restarts the container.
+set -euo pipefail
+
+IMAGE="ghcr.io/hemues/printers:latest"
+CONTAINER="printers"
+DATA_BASE="/nvme/pods-data/printers"
+
+echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Updating ${CONTAINER}..."
+
+podman stop  "${CONTAINER}" 2>/dev/null || true
+podman rm    "${CONTAINER}" 2>/dev/null || true
+podman rmi   "${IMAGE}"     2>/dev/null || true
+podman pull  "${IMAGE}"
+
+# Ensure data dirs exist and are owned by the printers user
+install -d -m 755 -o printers -g printers \
+    "${DATA_BASE}/printings" \
+    "${DATA_BASE}/configs" \
+    "${DATA_BASE}/logs"
+
+podman run -d \
+    --name "${CONTAINER}" \
+    --restart unless-stopped \
+    -p 8082:8082 \
+    -p 631:631 \
+    -p 139:139 \
+    -p 445:445 \
+    -p 137:137/udp \
+    -p 138:138/udp \
+    -v "${DATA_BASE}/printings:/printings:Z" \
+    -v "${DATA_BASE}/configs:/configs:Z" \
+    -v "${DATA_BASE}/logs:/logs:Z" \
+    "${IMAGE}"
+
+echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ${CONTAINER} started."

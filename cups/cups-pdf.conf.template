@@ -1,0 +1,20 @@
+# cups-pdf.conf — produces a PDF per print job under per-user directories.
+# The print_watcher in app/printer_engine.py picks each new PDF up, moves it
+# to /printings/<user>/<DATETIME>-<basename>.pdf, runs `pdfinfo` to count
+# pages and records an entry in the print log.
+
+Out  ${HOME}/cups-pdf
+Spool /var/spool/cups-pdf/SPOOL
+AnonDirName /var/spool/cups-pdf/ANONYMOUS
+AnonUser nobody
+Grp lp
+UserUMask 0022
+LogType 3
+Log /var/log/cups/cups-pdf_log
+GhostScript /usr/bin/gs
+GSCall %s -q -dCompatibilityLevel=%s -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite -sOutputFile="%s" -dAutoRotatePages=/PageByPage -dAutoFilterColorImages=false -dColorImageFilter=/FlateEncode -dPDFSETTINGS=/prepress -c .setpdfwrite -f %s
+PDFVer 1.4
+PostProcessing /usr/local/bin/cups-pdf-postprocess.sh
+DecodeHexStrings 0
+FixNewlines 0
+TitlePref 0
