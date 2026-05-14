@@ -2,8 +2,8 @@
 # Printers container — Alpine-based virtual print server with web admin UI
 #
 # Services running inside the container:
-#   - CUPS (cupsd) on 631     — print server with cups-pdf virtual backend
-#   - Samba (smbd)            — Windows print sharing (re-shares CUPS queues)
+#   - CUPS (cupsd) on 631     — print server with cups-pdf virtual backend (internal only)
+#   - Samba (smbd)            — Windows/macOS/Linux print sharing (re-shares CUPS queues)
 #   - Python aiohttp backend  — admin/user web UI on $PORT (default 8082)
 #
 # Volumes:
@@ -89,7 +89,7 @@ VOLUME /printings
 VOLUME /configs
 VOLUME /logs
 
-EXPOSE 8082 631 137/udp 138/udp 139 445
+EXPOSE 8082 137/udp 138/udp 139 445
 
 # Add build-time argument for version
 ARG VERSION=dev

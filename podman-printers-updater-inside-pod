@@ -24,7 +24,6 @@ podman run -d \
     --name "${CONTAINER}" \
     --restart unless-stopped \
     -p 8082:8082 \
-    -p 6631:631 \
     -v "${DATA_BASE}/printings:/printings:Z" \
     -v "${DATA_BASE}/configs:/configs:Z" \
     -v "${DATA_BASE}/logs:/logs:Z" \
