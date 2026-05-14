@@ -35,12 +35,12 @@ if ! command -v gh &>/dev/null; then
     error 'GitHub CLI (gh) not found. Install from https://cli.github.com'
 fi
 
-SRC_TAG=$(gh release view --repo Hemues/printers        --json tagName -q '.tagName' 2>/dev/null || echo "v0.0.0")
+SRC_TAG=$(gh release view --repo Hemues/printers-container --json tagName -q '.tagName' 2>/dev/null || echo "v0.0.0")
 IMG_TAG=$(gh release view --repo Hemues/printers-images --json tagName -q '.tagName' 2>/dev/null || echo "v0.0.0")
 
 SRC_VER="${SRC_TAG#v}"
 IMG_VER="${IMG_TAG#v}"
-echo "  Hemues/printers          latest: $SRC_VER"
+echo "  Hemues/printers-container latest: $SRC_VER"
 echo "  Hemues/printers-images   latest: $IMG_VER"
 
 HIGHEST=$(printf '%s\n%s\n' "$SRC_VER" "$IMG_VER" | sort -V | tail -1)
