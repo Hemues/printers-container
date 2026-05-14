@@ -47,7 +47,6 @@ RUN sed -i 's/\r$//g' docker-entrypoint.sh && \
       curl \
       file \
       cups \
-      cups-pdf \
       cups-bsd \
       cups-client \
       cups-filters \
