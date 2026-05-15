@@ -53,7 +53,7 @@ export class App implements OnInit {
   showAdminPanel = false;
   showChangePassword = false;
   showUserMenu = false;
-  showLogViewer = true;
+  showLogViewer = false;
   show2faSetup = false;
   twoFactorMode: 'enable' | 'disable' = 'enable';
 

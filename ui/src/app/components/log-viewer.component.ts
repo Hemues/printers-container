@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faTimes, faArrowLeft, faTrashAlt, faSearch, faDownload, faFileImport } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faArrowLeft, faTrashAlt, faSearch, faDownload, faFileImport } from '@fortawesome/free-solid-svg-icons';
 import { AuthService } from '../services/auth.service';
 import { DownloadsService } from '../services/downloads.service';
 
@@ -50,7 +50,7 @@ interface LogEntry {
               <fa-icon [icon]="faTrashAlt" class="me-1" /> Clear Log
             </button>
             <button class="btn btn-sm btn-outline-secondary" (click)="close.emit()">
-              <fa-icon [icon]="faTimes" />
+              <fa-icon [icon]="faXmark" />
             </button>
           </div>
         </div>
@@ -196,7 +196,7 @@ export class LogViewerComponent implements OnInit {
   private downloads = inject(DownloadsService);
   readonly close = output<void>();
 
-  faTimes = faTimes;
+  faXmark = faXmark;
   faArrowLeft = faArrowLeft;
   faTrashAlt = faTrashAlt;
   faSearch = faSearch;

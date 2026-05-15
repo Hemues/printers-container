@@ -4,6 +4,15 @@ All notable changes to the printers container are documented here.
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-05-15
+
+### Fixed
+- Print Log close button (X) now shows its icon: replaced deprecated `faTimes`
+  with `faXmark` (Font Awesome 6 rename).
+- Dashboard now starts with the stats view; the Print Log is hidden by default
+  and opened on demand via the "Show print log" button (reversed the initial
+  value of `showLogViewer`).
+
 ## [0.1.4] - 2026-05-15
 
 ### Fixed
