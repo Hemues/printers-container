@@ -4,6 +4,19 @@ All notable changes to the printers container are documented here.
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-05-15
+
+### Fixed
+- Change-password form now shows the success message before logging the user
+  out.  Previously, `_clearSession()` was called inside the RxJS `tap`
+  operator of `changePassword()`, which ran before the component's `next`
+  handler.  Angular's reactivity immediately removed the modal (because
+  `auth.isLoggedIn()` became false), so the user saw no feedback and could not
+  tell whether the change had succeeded.  Fixed by removing the eager
+  `_clearSession()` call; session cleanup now happens via `checkSession()`,
+  which receives a 401 for the now-invalid token and calls `_clearSession()`
+  in its `catchError` handler.
+
 ## [0.1.3] - 2026-05-15
 
 ### Fixed

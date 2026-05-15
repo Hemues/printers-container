@@ -202,13 +202,7 @@ export class AuthService {
       current_password: currentPassword,
       new_password: newPassword,
       new_password_confirm: newPasswordConfirm,
-    }).pipe(
-      tap((res: { status: string; msg: string }) => {
-        if (res.status === 'ok') {
-          this._clearSession();
-        }
-      })
-    );
+    });
   }
 
   uploadCookies(file: File): Observable<{ status: string }> {
