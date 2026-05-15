@@ -45,6 +45,11 @@ ln -sfn "$CONFIG_DIR/cups/cupsd.conf"     /etc/cups/cupsd.conf
 ln -sfn "$CONFIG_DIR/cups/cups-pdf.conf"  /etc/cups/cups-pdf.conf
 ln -sfn "$CONFIG_DIR/samba/smb.conf"      /etc/samba/smb.conf
 
+# Pre-initialise the Samba passdb TDB so the very first smbpasswd -a call does
+# not fail with "tdbsam_open: Converting version 0.0 database" during bootstrap.
+# pdbedit -L just lists users (empty is fine) and creates a valid TDB schema.
+pdbedit -L --configfile="$CONFIG_DIR/samba/smb.conf" >/dev/null 2>&1 || true
+
 # Install the post-processor that hands new PDFs off to the python backend.
 install -m 0755 /app/cups-pdf-postprocess.sh /usr/local/bin/cups-pdf-postprocess.sh 2>/dev/null || true
 

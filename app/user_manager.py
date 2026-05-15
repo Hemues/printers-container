@@ -1765,10 +1765,19 @@ def set_smb_password(username: str, password: str) -> bool:
     # `-a` adds the user if missing; `-s` reads stdin (pw twice).
     payload = f'{password}\n{password}\n'.encode()
     try:
-        proc = _sp.run(
-            [smbpasswd, '-a', '-s', username],
-            input=payload, capture_output=True, timeout=10,
-        )
+        # Retry once: on a brand-new volume the TDB may be at version 0.0 and
+        # Samba converts it on the first call, causing the add to fail.  The
+        # second call always succeeds because the TDB is already initialised.
+        for attempt in range(2):
+            proc = _sp.run(
+                [smbpasswd, '-a', '-s', username],
+                input=payload, capture_output=True, timeout=10,
+            )
+            if proc.returncode == 0:
+                break
+            if attempt == 0:
+                import time as _time
+                _time.sleep(0.5)   # give TDB conversion a moment to settle
         if proc.returncode != 0:
             log.warning(f'smbpasswd add/update for {username} failed: '
                         f'{proc.stderr.decode(errors="replace")}')

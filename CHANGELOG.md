@@ -4,6 +4,14 @@ All notable changes to the printers container are documented here.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-05-15
+
+### Fixed
+- Samba `passdb.tdb` version-0.0 error on first container start: entrypoint now
+  pre-initialises the TDB with `pdbedit -L` before starting daemons, and
+  `set_smb_password()` retries once after a 0.5 s delay so bootstrap users
+  (`admin`, `test`) are always created cleanly with no WARNING in the logs
+
 ## [0.1.1] - 2026-05-14
 
 ### Changed
