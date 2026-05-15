@@ -41,9 +41,7 @@ interface SettingEntry {
                 <fa-icon [icon]="faClipboardList" />
               </button>
             }
-            <button class="btn btn-sm btn-outline-secondary" (click)="close.emit()">
-              <fa-icon [icon]="faTimes" />
-            </button>
+            <button class="btn-close" (click)="close.emit()" aria-label="Close"></button>
           </div>
         </div>
 

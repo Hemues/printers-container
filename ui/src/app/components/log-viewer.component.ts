@@ -32,9 +32,7 @@ interface LogEntry {
               [disabled]="selectedCount === 0">
               <fa-icon [icon]="faDownload" class="me-1" /> Export Selected
             </button>
-            <button class="btn btn-sm btn-outline-secondary" (click)="close.emit()">
-              <fa-icon [icon]="faXmark" />
-            </button>
+            <button class="btn-close" (click)="close.emit()" aria-label="Close"></button>
           </div>
         </div>
 
