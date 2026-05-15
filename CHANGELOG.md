@@ -4,6 +4,15 @@ All notable changes to the printers container are documented here.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-05-15
+
+### Fixed
+- `smbpasswd -a` now succeeds on bootstrap: `set_smb_password()` creates a
+  locked system Unix account (`useradd --system --no-create-home`) before
+  calling `smbpasswd -a`, which requires the Unix user to exist in the tdbsam
+  backend.  The retry loop is removed (pre-init via `pdbedit -L` in the
+  entrypoint handles the TDB version-0.0 case separately).
+
 ## [0.1.2] - 2026-05-15
 
 ### Fixed
