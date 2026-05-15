@@ -17,69 +17,106 @@
       <span class="navbar-brand brand-contrast">
         <fa-icon [icon]="faPrint" class="me-1" /> Printers
       </span>
-      <div class="d-flex align-items-center gap-2 ms-auto">
-        <button class="btn btn-sm btn-outline-secondary button-toggle-theme"
-          (click)="cycleTheme()"
-          [title]="activeTheme?.displayName || 'Theme'">
-          <fa-icon [icon]="activeTheme?.icon || faCircleHalfStroke" />
-        </button>
-
+      <div class="navbar-nav ms-auto d-flex flex-row align-items-center gap-2">
         @if (auth.isAdmin()) {
-          <button class="btn btn-sm btn-outline-primary" (click)="showAdminPanel = true">
-            <fa-icon [icon]="faUserShield" class="me-1" /> Admin
+          <button class="btn btn-sm btn-outline-warning" (click)="showAdminPanel = true" title="Admin Panel">
+            <fa-icon [icon]="faUserShield" class="me-1" />
+            <span class="d-none d-sm-inline">ADMIN</span>
           </button>
         }
 
-        <span class="navbar-text small">{{ auth.username() }}</span>
-
-        <button class="btn btn-sm btn-outline-secondary" (click)="showChangePassword = true" title="Change password">
-          <fa-icon [icon]="faKey" />
-        </button>
-
-        @if (auth.totpEnabled()) {
-          <button class="btn btn-sm btn-outline-warning" (click)="openTwoFactorSetup('disable')" title="Disable 2FA">
-            <fa-icon [icon]="faShieldAlt" />
+        <!-- User menu dropdown -->
+        <div class="nav-item dropdown">
+          <button class="btn btn-link nav-link py-2 px-2 dropdown-toggle d-flex align-items-center"
+            type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <fa-icon [icon]="faUser" class="me-1" />
+            <span class="d-none d-md-inline">{{ auth.username() }}</span>
           </button>
-        } @else {
-          <button class="btn btn-sm btn-outline-secondary" (click)="openTwoFactorSetup('enable')" title="Enable 2FA">
-            <fa-icon [icon]="faShieldAlt" />
-          </button>
-        }
+          <ul class="dropdown-menu dropdown-menu-end position-absolute">
+            <li>
+              <button class="dropdown-item" (click)="showChangePassword = true">
+                <fa-icon [icon]="faKey" class="me-2" /> Change Password
+              </button>
+            </li>
+            <li>
+              @if (auth.totpEnabled()) {
+                <button class="dropdown-item text-danger" (click)="openTwoFactorSetup('disable')">
+                  <fa-icon [icon]="faShieldAlt" class="me-2" /> Disable 2FA
+                </button>
+              } @else {
+                <button class="dropdown-item text-success" (click)="openTwoFactorSetup('enable')">
+                  <fa-icon [icon]="faShieldAlt" class="me-2" /> Enable 2FA
+                </button>
+              }
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <button class="dropdown-item text-danger" (click)="logout()">
+                <fa-icon [icon]="faRightFromBracket" class="me-2" /> Logout
+              </button>
+            </li>
+          </ul>
+        </div>
 
-        <button class="btn btn-sm btn-outline-danger" (click)="logout()" title="Logout">
-          <fa-icon [icon]="faRightFromBracket" />
-        </button>
+        <!-- Theme dropdown -->
+        <div class="nav-item dropdown">
+          <button class="btn btn-link nav-link py-2 px-2 dropdown-toggle d-flex align-items-center"
+            type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            @if (activeTheme) {
+              <fa-icon [icon]="activeTheme.icon" />
+            }
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end position-absolute">
+            @for (theme of themes; track theme) {
+              <li>
+                <button class="dropdown-item d-flex align-items-center"
+                  [class.active]="activeTheme === theme"
+                  (click)="setTheme(theme)">
+                  <span class="me-2 opacity-50">
+                    <fa-icon [icon]="theme.icon" />
+                  </span>
+                  {{ theme.displayName }}
+                  @if (activeTheme === theme) {
+                    <span class="ms-auto ps-3">
+                      <fa-icon [icon]="faCheck" />
+                    </span>
+                  }
+                </button>
+              </li>
+            }
+          </ul>
+        </div>
       </div>
     </div>
   </nav>
 
   <main>
-    @if (showLogViewer) {
-      <app-log-viewer (close)="showLogViewer = false" />
-    } @else {
-      <div class="container-fluid py-4">
-        @if (stats(); as s) {
-          <div class="row justify-content-center mb-4">
-            <div class="col-12 col-sm-8 col-md-5 col-lg-3">
-              <div class="card text-center shadow-sm">
-                <div class="card-body py-4">
-                  <div class="text-muted small text-uppercase mb-1">This month</div>
-                  <div class="display-4 fw-bold mb-1">{{ s.month.pages }}</div>
-                  <div class="text-muted">pages</div>
-                  <div class="text-muted small mt-1">{{ s.month.jobs }} job(s)</div>
-                </div>
+    <div class="container-fluid py-4">
+      @if (stats(); as s) {
+        <div class="row justify-content-center mb-4">
+          <div class="col-12 col-sm-8 col-md-5 col-lg-3">
+            <div class="card text-center shadow-sm">
+              <div class="card-body py-4">
+                <div class="text-muted small text-uppercase mb-1">This month</div>
+                <div class="display-4 fw-bold mb-1">{{ s.month.pages }}</div>
+                <div class="text-muted">pages</div>
+                <div class="text-muted small mt-1">{{ s.month.jobs }} job(s)</div>
               </div>
             </div>
           </div>
-        }
-        <div class="text-center">
-          <button class="btn btn-primary" (click)="showLogViewer = true; fetchStats()">
-            <fa-icon [icon]="faClipboardList" class="me-2" /> Show Print Log
-          </button>
         </div>
+      }
+      <div class="text-center">
+        <button class="btn btn-primary" (click)="showLogViewer = true; fetchStats()">
+          <fa-icon [icon]="faClipboardList" class="me-2" /> Show Print Log
+        </button>
       </div>
-    }
+    </div>
   </main>
+
+  @if (showLogViewer) {
+    <app-log-viewer (close)="showLogViewer = false" />
+  }
 
   <footer class="footer navbar-dark bg-dark py-3 mt-auto">
     <div class="container text-center">

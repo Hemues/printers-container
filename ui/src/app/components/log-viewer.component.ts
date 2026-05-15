@@ -23,144 +23,149 @@ interface LogEntry {
   standalone: true,
   imports: [FormsModule, FontAwesomeModule],
   template: `
-    <div class="printers-section-header px-3">
-      <div class="d-flex justify-content-between align-items-center">
-        <span>Printings</span>
-        <div class="d-flex align-items-center gap-2">
-          <button class="btn btn-sm btn-outline-primary" (click)="exportSelected()"
-            [disabled]="selectedCount === 0">
-            <fa-icon [icon]="faDownload" class="me-1" /> Export Selected
-          </button>
-          <button class="btn btn-sm btn-outline-secondary" (click)="close.emit()">
-            <fa-icon [icon]="faXmark" />
-          </button>
+    <div class="log-overlay">
+      <div class="log-panel">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">Print Log</h5>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-primary" (click)="exportSelected()"
+              [disabled]="selectedCount === 0">
+              <fa-icon [icon]="faDownload" class="me-1" /> Export Selected
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" (click)="close.emit()">
+              <fa-icon [icon]="faXmark" />
+            </button>
+          </div>
         </div>
+
+        @if (statusMsg) {
+          <div class="alert py-2" [class.alert-success]="!statusIsError" [class.alert-danger]="statusIsError">
+            {{ statusMsg }}
+          </div>
+        }
+
+        @if (loading) {
+          <div class="text-center py-4">
+            <span class="spinner-border spinner-border-sm"></span> Loading...
+          </div>
+        } @else {
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+              <thead class="sticky-top bg-body">
+                <tr>
+                  <th style="width: 1.5rem;">
+                    <div class="form-check mb-0">
+                      <input type="checkbox" class="form-check-input"
+                        [checked]="masterChecked"
+                        [indeterminate]="masterIndeterminate"
+                        (change)="toggleSelectAll($event)">
+                    </div>
+                  </th>
+                  <th>
+                    <div class="d-flex align-items-center gap-1">
+                      <fa-icon [icon]="faSearch" class="text-muted" style="font-size:0.75em" />
+                      <input type="text" class="form-control form-control-sm"
+                        placeholder="Filename"
+                        [(ngModel)]="filterName"
+                        (ngModelChange)="applyFilters()">
+                    </div>
+                  </th>
+                  <th style="width: 160px;">
+                    <div class="d-flex align-items-center gap-1">
+                      <fa-icon [icon]="faSearch" class="text-muted" style="font-size:0.75em" />
+                      <input type="text" class="form-control form-control-sm"
+                        placeholder="Date"
+                        [(ngModel)]="filterDate"
+                        (ngModelChange)="applyFilters()">
+                    </div>
+                  </th>
+                  <th style="width: 130px;">
+                    <div class="d-flex align-items-center gap-1">
+                      <fa-icon [icon]="faSearch" class="text-muted" style="font-size:0.75em" />
+                      <input type="text" class="form-control form-control-sm"
+                        placeholder="Status"
+                        [(ngModel)]="filterStatus"
+                        (ngModelChange)="applyFilters()">
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                @if (filteredEntries.length === 0) {
+                  <tr>
+                    <td colspan="4" class="text-center text-muted py-3">
+                      @if (entries.length === 0) {
+                        No log entries.
+                      } @else {
+                        No matching entries.
+                      }
+                    </td>
+                  </tr>
+                }
+                @for (entry of filteredEntries; track $index) {
+                  <tr>
+                    <td>
+                      @if (entry.file_exists && entry.filename) {
+                        <div class="form-check mb-0">
+                          <input type="checkbox" class="form-check-input"
+                            [(ngModel)]="entry.checked"
+                            (ngModelChange)="updateSelection()">
+                        </div>
+                      }
+                    </td>
+                    <td class="small text-break">
+                      @if (entry.file_exists && entry.filename) {
+                        <a [href]="buildFileLink(entry)" target="_blank" class="text-decoration-none">{{ entry.filename }}</a>
+                      } @else {
+                        {{ entry.filename || entry.name }}
+                      }
+                    </td>
+                    <td class="small text-nowrap">{{ entry.datetime }}</td>
+                    <td>
+                      <span class="badge"
+                        [class.bg-success]="entry.status === 'finished'"
+                        [class.bg-danger]="entry.status === 'failed'"
+                        [class.bg-secondary]="entry.status !== 'finished' && entry.status !== 'failed'">
+                        {{ entry.status }}
+                      </span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="text-muted small mt-2">
+            {{ filteredEntries.length }} of {{ entries.length }} entries
+            @if (selectedCount > 0) {
+              &nbsp;· {{ selectedCount }} selected
+            }
+          </div>
+        }
       </div>
-    </div>
-
-    <div class="container-fluid mt-3">
-      @if (statusMsg) {
-        <div class="alert py-2" [class.alert-success]="!statusIsError" [class.alert-danger]="statusIsError">
-          {{ statusMsg }}
-        </div>
-      }
-
-      @if (loading) {
-        <div class="text-center py-4">
-          <span class="spinner-border spinner-border-sm"></span> Loading...
-        </div>
-      } @else {
-        <div class="table-responsive">
-          <table class="table table-sm table-hover align-middle mb-0">
-            <thead class="sticky-top bg-body">
-              <tr>
-                <th style="width: 1.5rem;">
-                  <div class="form-check mb-0">
-                    <input type="checkbox" class="form-check-input"
-                      [checked]="masterChecked"
-                      [indeterminate]="masterIndeterminate"
-                      (change)="toggleSelectAll($event)">
-                  </div>
-                </th>
-                <th>
-                  <div class="d-flex align-items-center gap-1">
-                    <fa-icon [icon]="faSearch" class="text-muted" style="font-size:0.75em" />
-                    <input type="text" class="form-control form-control-sm"
-                      placeholder="Filename"
-                      [(ngModel)]="filterName"
-                      (ngModelChange)="applyFilters()">
-                  </div>
-                </th>
-                <th style="width: 160px;">
-                  <div class="d-flex align-items-center gap-1">
-                    <fa-icon [icon]="faSearch" class="text-muted" style="font-size:0.75em" />
-                    <input type="text" class="form-control form-control-sm"
-                      placeholder="Date"
-                      [(ngModel)]="filterDate"
-                      (ngModelChange)="applyFilters()">
-                  </div>
-                </th>
-                <th style="width: 130px;">
-                  <div class="d-flex align-items-center gap-1">
-                    <fa-icon [icon]="faSearch" class="text-muted" style="font-size:0.75em" />
-                    <input type="text" class="form-control form-control-sm"
-                      placeholder="Status"
-                      [(ngModel)]="filterStatus"
-                      (ngModelChange)="applyFilters()">
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              @if (filteredEntries.length === 0) {
-                <tr>
-                  <td colspan="4" class="text-center text-muted py-3">
-                    @if (entries.length === 0) {
-                      No log entries.
-                    } @else {
-                      No matching entries.
-                    }
-                  </td>
-                </tr>
-              }
-              @for (entry of filteredEntries; track $index) {
-                <tr>
-                  <td>
-                    @if (entry.file_exists && entry.filename) {
-                      <div class="form-check mb-0">
-                        <input type="checkbox" class="form-check-input"
-                          [(ngModel)]="entry.checked"
-                          (ngModelChange)="updateSelection()">
-                      </div>
-                    }
-                  </td>
-                  <td class="small text-break">
-                    @if (entry.file_exists && entry.filename) {
-                      <a [href]="buildFileLink(entry)" target="_blank" class="text-decoration-none">{{ entry.filename }}</a>
-                    } @else {
-                      {{ entry.filename || entry.name }}
-                    }
-                  </td>
-                  <td class="small text-nowrap">{{ entry.datetime }}</td>
-                  <td>
-                    <span class="badge"
-                      [class.bg-success]="entry.status === 'finished'"
-                      [class.bg-danger]="entry.status === 'failed'"
-                      [class.bg-secondary]="entry.status !== 'finished' && entry.status !== 'failed'">
-                      {{ entry.status }}
-                    </span>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-        <div class="text-muted small mt-2 px-1">
-          {{ filteredEntries.length }} of {{ entries.length }} entries
-          @if (selectedCount > 0) {
-            &nbsp;· {{ selectedCount }} selected
-          }
-        </div>
-      }
     </div>
   `,
   styles: [`
-    .printers-section-header {
-      font-size: 1.8rem;
-      font-weight: 300;
-      position: relative;
-      background: var(--bs-secondary-bg);
-      padding: 0.75rem 1rem;
+    .log-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 9999;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 1rem;
+      overflow-y: auto;
     }
-    .printers-section-header::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      left: -9999px;
-      right: 0;
-      border-left: 9999px solid var(--bs-secondary-bg);
-      box-shadow: 9999px 0 0 var(--bs-secondary-bg);
+    .log-panel {
+      width: 100%;
+      max-width: 1100px;
+      padding: 1.5rem;
+      border-radius: 12px;
+      background: var(--bs-body-bg);
+      border: 1px solid var(--bs-border-color);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      margin-top: 4rem;
+      margin-bottom: 2rem;
     }
   `]
 })

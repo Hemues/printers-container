@@ -5,7 +5,7 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import {
   faSun, faMoon, faCircleHalfStroke, faUser, faUserShield, faSignOutAlt, faKey,
-  faShieldAlt, faEnvelope, faRightFromBracket, faClipboardList, faPrint,
+  faShieldAlt, faEnvelope, faRightFromBracket, faClipboardList, faPrint, faCheck,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { AuthService } from './services/auth.service';
@@ -45,6 +45,7 @@ export class App implements OnInit {
   faKey = faKey; faShieldAlt = faShieldAlt; faEnvelope = faEnvelope;
   faRightFromBracket = faRightFromBracket; faClipboardList = faClipboardList;
   faPrint = faPrint;
+  faCheck = faCheck;
 
   themes: Theme[] = Themes;
   activeTheme: Theme | undefined;
