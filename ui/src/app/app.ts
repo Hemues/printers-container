@@ -90,6 +90,12 @@ export class App implements OnInit {
     localStorage.setItem('printers_theme', theme.id);
   }
 
+  cycleTheme() {
+    const idx = this.themes.findIndex(t => t === this.activeTheme);
+    const next = this.themes[(idx + 1) % this.themes.length];
+    this.setTheme(next);
+  }
+
   private afterSession() {
     this.connectSocket();
     this.fetchStats();

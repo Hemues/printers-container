@@ -4,6 +4,22 @@ All notable changes to the printers container are documented here.
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-05-15
+
+### Changed
+- Landing page: shows only the **monthly** page/job count by default; the full
+  print log is opened on demand via "Show Print Log".
+- Print Log (log viewer): now renders **inline** on the page (no full-screen
+  overlay); columns are **Filename / Date / Status** with per-column search
+  filters; action buttons reduced to **Export Selected** + close.
+- Navbar: theme picker is now a **single click-to-cycle** button (no dropdown).
+  User is shown as plain text with individual icon buttons for Change Password,
+  2FA toggle, and Logout — no dropdown.
+- Brand "Printers" text is now always **white** on the dark navbar, fixing the
+  black-on-dark-grey contrast issue.
+- Footer added: always shows **app** and **container** version for easy
+  troubleshooting.
+
 ## [0.1.5] - 2026-05-15
 
 ### Fixed

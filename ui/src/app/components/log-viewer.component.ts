@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faXmark, faArrowLeft, faTrashAlt, faSearch, faDownload, faFileImport } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faSearch, faDownload } from '@fortawesome/free-solid-svg-icons';
 import { AuthService } from '../services/auth.service';
 import { DownloadsService } from '../services/downloads.service';
 
@@ -23,7 +23,283 @@ interface LogEntry {
   standalone: true,
   imports: [FormsModule, FontAwesomeModule],
   template: `
-    <div class="log-overlay">
+    <div class="printers-section-header px-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <span>Printings</span>
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-sm btn-outline-primary" (click)="exportSelected()"
+            [disabled]="selectedCount === 0">
+            <fa-icon [icon]="faDownload" class="me-1" /> Export Selected
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" (click)="close.emit()">
+            <fa-icon [icon]="faXmark" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="container-fluid mt-3">
+      @if (statusMsg) {
+        <div class="alert py-2" [class.alert-success]="!statusIsError" [class.alert-danger]="statusIsError">
+          {{ statusMsg }}
+        </div>
+      }
+
+      @if (loading) {
+        <div class="text-center py-4">
+          <span class="spinner-border spinner-border-sm"></span> Loading…
+        </div>
+      } @else {
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="sticky-top bg-body">
+              <tr>
+                <th style="width: 1.5rem;">
+                  <div class="form-check">
+                    <input type="checkbox" class="form-check-input"
+                      [checked]="masterChecked"
+                      [indeterminate]="masterIndeterminate"
+                      (change)="toggleSelectAll($event)">
+                  </div>
+                </th>
+                <th>
+                  <div class="d-flex align-items-center gap-1">
+                    <fa-icon [icon]="faSearch" class="text-muted" style="font-size:0.75em" />
+                    <input type="text" class="form-control form-control-sm"
+                      placeholder="Filename"
+                      [(ngModel)]="filterName"
+                      (ngModelChange)="applyFilters()">
+                  </div>
+                </th>
+                <th style="width: 170px">
+                  <div class="d-flex align-items-center gap-1">
+                    <fa-icon [icon]="faSearch" class="text-muted" style="font-size:0.75em" />
+                    <input type="text" class="form-control form-control-sm"
+                      placeholder="Date"
+                      [(ngModel)]="filterDate"
+                      (ngModelChange)="applyFilters()">
+                  </div>
+                </th>
+                <th style="width: 130px">
+                  <div class="d-flex align-items-center gap-1">
+                    <fa-icon [icon]="faSearch" class="text-muted" style="font-size:0.75em" />
+                    <input type="text" class="form-control form-control-sm"
+                      placeholder="Status"
+                      [(ngModel)]="filterStatus"
+                      (ngModelChange)="applyFilters()">
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (filteredEntries.length === 0) {
+                <tr>
+                  <td colspan="4" class="text-center text-muted py-3">
+                    @if (entries.length === 0) {
+                      No print jobs recorded.
+                    } @else {
+                      No matching entries.
+                    }
+                  </td>
+                </tr>
+              }
+              @for (entry of filteredEntries; track $index) {
+                <tr>
+                  <td>
+                    @if (entry.file_exists && entry.filename) {
+                      <div class="form-check">
+                        <input type="checkbox" class="form-check-input"
+                          [(ngModel)]="entry.checked"
+                          (ngModelChange)="updateSelection()">
+                      </div>
+                    }
+                  </td>
+                  <td class="small">
+                    @if (entry.file_exists && entry.filename) {
+                      <a [href]="buildFileLink(entry)" target="_blank" class="text-decoration-none">{{ entry.name || entry.filename }}</a>
+                    } @else {
+                      {{ entry.name || entry.filename }}
+                    }
+                  </td>
+                  <td class="small text-nowrap">{{ entry.datetime }}</td>
+                  <td class="small">
+                    <span class="badge"
+                      [class.bg-success]="entry.status === 'finished'"
+                      [class.bg-danger]="entry.status === 'failed'"
+                      [class.bg-secondary]="entry.status !== 'finished' && entry.status !== 'failed'">
+                      {{ entry.status || '—' }}
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="text-muted small mt-2">
+          {{ filteredEntries.length }} of {{ entries.length }} entries
+          @if (selectedCount > 0) {
+            &nbsp;· {{ selectedCount }} selected
+          }
+        </div>
+      }
+    </div>
+  `,
+  styles: [`
+    .printers-section-header {
+      font-size: 1.8rem;
+      font-weight: 300;
+      position: relative;
+      background: var(--bs-secondary-bg);
+      padding: 0.75rem 1rem;
+    }
+    .printers-section-header::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: -9999px;
+      right: 0;
+      border-left: 9999px solid var(--bs-secondary-bg);
+      box-shadow: 9999px 0 0 var(--bs-secondary-bg);
+    }
+  `]
+})
+export class LogViewerComponent implements OnInit {
+  private auth = inject(AuthService);
+  private downloads = inject(DownloadsService);
+  readonly close = output<void>();
+
+  faXmark = faXmark;
+  faSearch = faSearch;
+  faDownload = faDownload;
+
+  entries: LogEntry[] = [];
+  filteredEntries: LogEntry[] = [];
+  loading = true;
+  statusMsg = '';
+  statusIsError = false;
+
+  filterName = '';
+  filterDate = '';
+  filterStatus = '';
+
+  masterChecked = false;
+  masterIndeterminate = false;
+  selectedCount = 0;
+
+  ngOnInit() {
+    this.loadLog();
+  }
+
+  loadLog() {
+    this.loading = true;
+    this.auth.getDownloadLog().subscribe({
+      next: (res) => {
+        this.loading = false;
+        this.entries = (res.entries || []).map((e: any) => this.parseEntry(e)).reverse();
+        this.applyFilters();
+        this.updateSelection();
+      },
+      error: () => {
+        this.loading = false;
+        this.showStatus('Failed to load log.', true);
+      },
+    });
+  }
+
+  parseEntry(entry: any): LogEntry {
+    if (typeof entry === 'object' && entry !== null) {
+      return {
+        url: entry.url || entry.printer || '',
+        name: entry.name || entry.title || '',
+        datetime: entry.datetime || '',
+        size: entry.size || '',
+        filename: entry.filename || '',
+        username: entry.username || '',
+        pages: Number(entry.pages || 0),
+        status: entry.status || '',
+        file_exists: entry.file_exists !== false,
+        checked: false,
+      };
+    }
+    return { url: String(entry), name: '', datetime: '', size: '', filename: '', username: '', pages: 0, status: '', file_exists: false, checked: false };
+  }
+
+  buildFileLink(entry: LogEntry): string {
+    const baseDir = this.downloads.configuration['PUBLIC_HOST_URL'] || 'printings/';
+    const segments = [entry.username, entry.filename].filter(s => !!s);
+    const encoded = segments.map(p => encodeURIComponent(p)).join('/');
+    return baseDir + encoded;
+  }
+
+  applyFilters() {
+    let result = this.entries;
+    if (this.filterName) {
+      try {
+        const re = new RegExp(this.filterName, 'i');
+        result = result.filter(e => re.test(e.name) || re.test(e.filename));
+      } catch {
+        const lower = this.filterName.toLowerCase();
+        result = result.filter(e => e.name.toLowerCase().includes(lower) || e.filename.toLowerCase().includes(lower));
+      }
+    }
+    if (this.filterDate) {
+      result = result.filter(e => e.datetime.includes(this.filterDate));
+    }
+    if (this.filterStatus) {
+      try {
+        const re = new RegExp(this.filterStatus, 'i');
+        result = result.filter(e => re.test(e.status));
+      } catch {
+        const lower = this.filterStatus.toLowerCase();
+        result = result.filter(e => e.status.toLowerCase().includes(lower));
+      }
+    }
+    this.filteredEntries = result;
+    this.updateSelection();
+  }
+
+  toggleSelectAll(event: Event) {
+    const checked = (event.target as HTMLInputElement).checked;
+    for (const entry of this.filteredEntries) {
+      if (entry.file_exists && entry.filename) {
+        entry.checked = checked;
+      }
+    }
+    this.updateSelection();
+  }
+
+  updateSelection() {
+    const checkable = this.filteredEntries.filter(e => e.file_exists && e.filename);
+    const checked = checkable.filter(e => e.checked).length;
+    this.selectedCount = checked;
+    this.masterChecked = checkable.length > 0 && checked === checkable.length;
+    this.masterIndeterminate = checked > 0 && checked < checkable.length;
+  }
+
+  private getSelectedEntries(): LogEntry[] {
+    return this.filteredEntries.filter(e => e.checked && e.file_exists && e.filename);
+  }
+
+  exportSelected() {
+    const selected = this.getSelectedEntries();
+    for (const entry of selected) {
+      const link = document.createElement('a');
+      link.href = this.buildFileLink(entry);
+      link.setAttribute('download', entry.filename.split('/').pop() || entry.name);
+      link.setAttribute('target', '_self');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  }
+
+  private showStatus(msg: string, isError = false) {
+    this.statusMsg = msg;
+    this.statusIsError = isError;
+    setTimeout(() => { this.statusMsg = ''; }, 4000);
+  }
+}
       <div class="log-panel">
         <div class="log-header d-flex justify-content-between align-items-center mb-3">
           <h4 class="mb-0">

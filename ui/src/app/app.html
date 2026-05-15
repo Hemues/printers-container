@@ -12,31 +12,17 @@
 @if (!auth.isLoggedIn()) {
   <app-login (loggedIn)="onLoggedIn()" />
 } @else {
-  <!-- Top bar -->
-  <nav class="navbar navbar-expand-md sticky-top border-bottom mb-3"
-       [class.bg-body-tertiary]="true">
+  <nav class="navbar navbar-expand-md sticky-top border-bottom">
     <div class="container-fluid">
-      <span class="navbar-brand d-flex align-items-center gap-2">
-        <fa-icon [icon]="faPrint" /> Printers
-        @if (printersVersion) {
-          <small class="text-muted ms-1">v{{ printersVersion }}</small>
-        }
+      <span class="navbar-brand brand-contrast">
+        <fa-icon [icon]="faPrint" class="me-1" /> Printers
       </span>
       <div class="d-flex align-items-center gap-2 ms-auto">
-        <!-- Theme picker -->
-        <div ngbDropdown class="d-inline-block">
-          <button class="btn btn-sm btn-outline-secondary" ngbDropdownToggle>
-            <fa-icon [icon]="activeTheme?.icon || faCircleHalfStroke" />
-          </button>
-          <div ngbDropdownMenu>
-            @for (t of themes; track t.id) {
-              <button ngbDropdownItem (click)="setTheme(t)">
-                <fa-icon [icon]="t.icon" class="me-2" />
-                {{ t.displayName }}
-              </button>
-            }
-          </div>
-        </div>
+        <button class="btn btn-sm btn-outline-secondary button-toggle-theme"
+          (click)="cycleTheme()"
+          [title]="activeTheme?.displayName || 'Theme'">
+          <fa-icon [icon]="activeTheme?.icon || faCircleHalfStroke" />
+        </button>
 
         @if (auth.isAdmin()) {
           <button class="btn btn-sm btn-outline-primary" (click)="showAdminPanel = true">
@@ -44,90 +30,75 @@
           </button>
         }
 
-        <!-- User menu -->
-        <div ngbDropdown class="d-inline-block">
-          <button class="btn btn-sm btn-outline-secondary" ngbDropdownToggle>
-            <fa-icon [icon]="faUser" class="me-1" /> {{ auth.username() }}
+        <span class="navbar-text small">{{ auth.username() }}</span>
+
+        <button class="btn btn-sm btn-outline-secondary" (click)="showChangePassword = true" title="Change password">
+          <fa-icon [icon]="faKey" />
+        </button>
+
+        @if (auth.totpEnabled()) {
+          <button class="btn btn-sm btn-outline-warning" (click)="openTwoFactorSetup('disable')" title="Disable 2FA">
+            <fa-icon [icon]="faShieldAlt" />
           </button>
-          <div ngbDropdownMenu>
-            <button ngbDropdownItem (click)="showChangePassword = true">
-              <fa-icon [icon]="faKey" class="me-2" /> Change password
-            </button>
-            @if (auth.totpEnabled()) {
-              <button ngbDropdownItem (click)="openTwoFactorSetup('disable')">
-                <fa-icon [icon]="faShieldAlt" class="me-2" /> Disable 2FA
-              </button>
-            } @else {
-              <button ngbDropdownItem (click)="openTwoFactorSetup('enable')">
-                <fa-icon [icon]="faShieldAlt" class="me-2" /> Enable 2FA
-              </button>
-            }
-            <div class="dropdown-divider"></div>
-            <button ngbDropdownItem (click)="logout()">
-              <fa-icon [icon]="faRightFromBracket" class="me-2" /> Logout
-            </button>
-          </div>
-        </div>
+        } @else {
+          <button class="btn btn-sm btn-outline-secondary" (click)="openTwoFactorSetup('enable')" title="Enable 2FA">
+            <fa-icon [icon]="faShieldAlt" />
+          </button>
+        }
+
+        <button class="btn btn-sm btn-outline-danger" (click)="logout()" title="Logout">
+          <fa-icon [icon]="faRightFromBracket" />
+        </button>
       </div>
     </div>
   </nav>
 
-  <main class="container-fluid">
-    <!-- Stats card -->
-    @if (stats(); as s) {
-      <div class="row g-3 mb-3">
-        <div class="col-6 col-md-3">
-          <div class="card h-100">
-            <div class="card-body">
-              <div class="text-muted small text-uppercase">Today</div>
-              <div class="h3 mb-0">{{ s.today.pages }} <small class="text-muted">pages</small></div>
-              <div class="text-muted small">{{ s.today.jobs }} job(s)</div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-md-3">
-          <div class="card h-100">
-            <div class="card-body">
-              <div class="text-muted small text-uppercase">This month</div>
-              <div class="h3 mb-0">{{ s.month.pages }} <small class="text-muted">pages</small></div>
-              <div class="text-muted small">{{ s.month.jobs }} job(s)</div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-md-3">
-          <div class="card h-100">
-            <div class="card-body">
-              <div class="text-muted small text-uppercase">This year</div>
-              <div class="h3 mb-0">{{ s.year.pages }} <small class="text-muted">pages</small></div>
-              <div class="text-muted small">{{ s.year.jobs }} job(s)</div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-md-3">
-          <div class="card h-100">
-            <div class="card-body">
-              <div class="text-muted small text-uppercase">Overall</div>
-              <div class="h3 mb-0">{{ s.overall.pages }} <small class="text-muted">pages</small></div>
-              <div class="text-muted small">{{ s.overall.jobs }} job(s)</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    }
-
-    <!-- Print log -->
+  <main>
     @if (showLogViewer) {
       <app-log-viewer (close)="showLogViewer = false" />
     } @else {
-      <div class="text-center mt-4">
-        <button class="btn btn-primary" (click)="showLogViewer = true; fetchStats()">
-          <fa-icon [icon]="faClipboardList" class="me-2" /> Show print log
-        </button>
+      <div class="container-fluid py-4">
+        @if (stats(); as s) {
+          <div class="row justify-content-center mb-4">
+            <div class="col-12 col-sm-8 col-md-5 col-lg-3">
+              <div class="card text-center shadow-sm">
+                <div class="card-body py-4">
+                  <div class="text-muted small text-uppercase mb-1">This month</div>
+                  <div class="display-4 fw-bold mb-1">{{ s.month.pages }}</div>
+                  <div class="text-muted">pages</div>
+                  <div class="text-muted small mt-1">{{ s.month.jobs }} job(s)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+        <div class="text-center">
+          <button class="btn btn-primary" (click)="showLogViewer = true; fetchStats()">
+            <fa-icon [icon]="faClipboardList" class="me-2" /> Show Print Log
+          </button>
+        </div>
       </div>
     }
   </main>
 
-  <!-- Forced password change -->
+  <footer class="footer navbar-dark bg-dark py-3 mt-auto">
+    <div class="container text-center">
+      @if (printersVersion) {
+        <div class="footer-content">
+          <div class="version-item">
+            <span class="version-label">app</span>
+            <span class="version-value">{{ printersVersion }}</span>
+          </div>
+          <div class="version-separator"></div>
+          <div class="version-item">
+            <span class="version-label">container</span>
+            <span class="version-value">{{ printersVersion }}</span>
+          </div>
+        </div>
+      }
+    </div>
+  </footer>
+
   @if (auth.mustChangePassword() || showChangePassword) {
     <app-change-password
       [forceChange]="auth.mustChangePassword()"
