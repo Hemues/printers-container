@@ -317,12 +317,22 @@ def index(request):
 # Serve service-worker scripts with no-cache to ensure updates propagate
 @routes.get(config.URL_PREFIX + 'ngsw-worker.js')
 def serve_ngsw_worker(request):
-    path = os.path.join(UI_ROOT, 'ngsw-worker.js')
-    if not os.path.isfile(path):
-        return web.Response(status=404, text='Not found')
-    resp = web.FileResponse(path)
+    # Return a self-unregistering SW script to kill the old Angular NGSW
+    kill_script = """self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then(names => Promise.all(names.map(n => caches.delete(n))))
+    .then(() => self.clients.claim())
+    .then(() => self.registration.unregister())
+    .then(() => self.clients.matchAll())
+    .then(clients => clients.forEach(c => c.navigate(c.url)))
+  );
+});
+"""
+    resp = web.Response(text=kill_script, content_type='text/javascript')
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     resp.headers['Service-Worker-Allowed'] = '/'
+    resp.headers['Clear-Site-Data'] = '"cache", "storage"'
     return resp
 
 
@@ -344,6 +354,7 @@ def serve_ngsw_json(request):
         return web.Response(status=404, text='Not found')
     resp = web.FileResponse(path)
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Clear-Site-Data'] = '"cache", "storage"'
     return resp
 
 
