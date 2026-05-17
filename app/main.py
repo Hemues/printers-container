@@ -314,6 +314,7 @@ def index(request):
 
 
 @routes.get(config.URL_PREFIX + 'version')
+@routes.get(config.URL_PREFIX + 'api/version')
 def get_version(request):
     return web.json_response({'version': CONTAINER_VERSION})
 
@@ -783,20 +784,31 @@ def _parse_lpstat_printers() -> list[dict]:
     rc_p, out_p, _ = _run(['lpstat', '-p'])
     rc_v, out_v, _ = _run(['lpstat', '-v'])
     printers: dict[str, dict] = {}
-    # `lpstat -p` lines: "printer <name> is idle/disabled.  enabled since ..."
+    # `lpstat -p` lines:
+    #   enabled:  "printer <name> is idle.  enabled since ..."
+    #   disabled: "printer <name> disabled since ..."
     for line in (out_p or '').splitlines():
         if not line.startswith('printer '):
             continue
         parts = line.split(maxsplit=3)
-        if len(parts) < 4:
+        if len(parts) < 3:
             continue
         name = parts[1]
-        state_word = parts[3].rstrip('.').lower()
-        enabled = 'disabled' not in state_word
+        rest = line.lower()
+        is_disabled = 'disabled' in rest
+        # extract clean state keyword
+        if is_disabled:
+            state = 'disabled'
+        elif 'idle' in rest:
+            state = 'idle'
+        elif 'printing' in rest or 'processing' in rest:
+            state = 'processing'
+        else:
+            state = parts[2].rstrip('.').lower() if len(parts) > 2 else 'unknown'
         printers[name] = {
             'name': name,
-            'status': state_word,
-            'enabled': enabled,
+            'status': state,
+            'enabled': not is_disabled,
             'uri': '',
             'accepting': True,
         }

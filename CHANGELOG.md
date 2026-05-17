@@ -4,6 +4,18 @@ All notable changes to the printers container are documented here.
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-05-17
+
+### Fixed
+- Version endpoint: added `GET /api/version` alias (frontend fetches
+  `api/version` but only `/version` existed).
+- `lpstat -p` parser: disabled printers were incorrectly shown as enabled
+  because the word "disabled" appears in `parts[2]`, not `parts[3]`; now
+  checks the full line and extracts a clean state keyword (`idle` /
+  `disabled` / `processing`).
+- Footer: removed redundant duplicate "app" + "container" rows; now shows
+  a single "container" version line, matching the videodl footer style.
+
 ## [0.1.10] - 2026-05-23
 
 ### Added
