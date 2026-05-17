@@ -1,4 +1,5 @@
 import { Component, inject, OnInit, output } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../services/auth.service';
 
@@ -118,6 +119,12 @@ import { AuthService } from '../services/auth.service';
           }
         </div>
       }
+      <div class="login-footer">
+        @if (version) {
+          <span class="version-label">container</span>
+          <span class="version-value">{{ version }}</span>
+        }
+      </div>
     </div>
   `,
   styles: [`
@@ -159,11 +166,35 @@ import { AuthService } from '../services/auth.service';
       box-shadow: 0 4px 24px rgba(0,0,0,0.2);
       z-index: 10001;
     }
+    .login-footer {
+      position: fixed;
+      bottom: 1rem;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 0.8rem;
+      opacity: 0.6;
+    }
+    .login-footer .version-label {
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-size: 0.7rem;
+      margin-right: 6px;
+    }
+    .login-footer .version-value {
+      font-family: monospace;
+      padding: 2px 6px;
+      background: rgba(128,128,128,0.15);
+      border-radius: 4px;
+    }
   `]
 })
 export class LoginComponent implements OnInit {
   private auth = inject(AuthService);
+  private http = inject(HttpClient);
   readonly loggedIn = output<void>();
+
+  version: string | null = null;
 
   username = '';
   password = '';
@@ -193,6 +224,10 @@ export class LoginComponent implements OnInit {
     this.auth.checkRecoveryAvailable().subscribe({
       next: (res) => this.recoveryAvailable = res.available,
       error: () => this.recoveryAvailable = false
+    });
+    this.http.get<{ version: string }>('api/version').subscribe({
+      next: (r) => this.version = r.version,
+      error: () => { /* ignore */ }
     });
   }
 

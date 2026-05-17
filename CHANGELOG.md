@@ -4,6 +4,13 @@ All notable changes to the printers container are documented here.
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-05-17
+
+### Added
+- Version display in the login page footer (fetches `GET /api/version` and
+  shows "container 0.1.12" at the bottom of the login card, matching the
+  main-app footer style).
+
 ## [0.1.11] - 2026-05-17
 
 ### Fixed
