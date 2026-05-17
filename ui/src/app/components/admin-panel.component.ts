@@ -2,7 +2,7 @@ import { Component, inject, OnInit, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faTrashCan, faKey, faUserPlus, faLock, faUnlock, faGear, faFloppyDisk, faShieldHalved, faToggleOn, faToggleOff, faEnvelope, faClipboardList, faPrint, faPlus, faChartBar } from '@fortawesome/free-solid-svg-icons';
+import { faTrashCan, faKey, faUserPlus, faLock, faUnlock, faGear, faFloppyDisk, faShieldHalved, faToggleOn, faToggleOff, faEnvelope, faClipboardList, faPrint, faPlus, faChartBar, faArrowLeft, faCircleCheck, faCircleXmark, faPenToSquare, faSearch, faNetworkWired, faUsb, faServer, faGlobe } from '@fortawesome/free-solid-svg-icons';
 import { AuthService, UserRecord } from '../services/auth.service';
 
 interface SettingEntry {
@@ -22,7 +22,7 @@ interface SettingEntry {
         <div class="admin-header d-flex justify-content-between align-items-center mb-3">
           <h4 class="mb-0">
             <button class="btn btn-sm btn-outline-secondary me-2" (click)="close.emit()" title="Back">
-              &larr;
+              <fa-icon [icon]="faArrowLeft" />
             </button>
             Admin Panel — User Management
           </h4>
@@ -363,14 +363,17 @@ interface SettingEntry {
           </div>
         }
 
-        <!-- CUPS Printers Modal -->
+        <!-- CUPS Printers / Printer Server Settings Modal -->
         @if (showPrinters) {
           <div class="modal fade show d-block" style="background:rgba(0,0,0,0.4)">
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-xl">
               <div class="modal-content">
                 <div class="modal-header py-2">
-                  <h6 class="modal-title">CUPS Printers</h6>
-                  <button class="btn-close btn-close-sm" (click)="showPrinters = false"></button>
+                  <h6 class="modal-title">
+                    <fa-icon [icon]="faPrint" class="me-2" />
+                    Printer Server Settings
+                  </h6>
+                  <button class="btn-close" (click)="showPrinters = false"></button>
                 </div>
                 <div class="modal-body">
                   @if (printersStatusMsg) {
@@ -378,22 +381,17 @@ interface SettingEntry {
                       {{ printersStatusMsg }}
                     </div>
                   }
-                  <!-- Add printer form -->
-                  <form class="row g-2 align-items-end mb-3" (ngSubmit)="addPrinter()">
-                    <div class="col-md-4">
-                      <label class="form-label mb-0 small">Printer name</label>
-                      <input type="text" class="form-control form-control-sm" [(ngModel)]="newPrinterName" name="newPrinterName" placeholder="HP_LaserJet" required>
-                    </div>
-                    <div class="col-md-5">
-                      <label class="form-label mb-0 small">URI (e.g. socket://192.168.1.5:9100)</label>
-                      <input type="text" class="form-control form-control-sm" [(ngModel)]="newPrinterUri" name="newPrinterUri" placeholder="socket://192.168.1.5:9100" required>
-                    </div>
-                    <div class="col-md-3">
-                      <button type="submit" class="btn btn-sm btn-success w-100" [disabled]="!newPrinterName || !newPrinterUri || printersBusy">
-                        <fa-icon [icon]="faPlus" class="me-1" /> Add
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small class="text-muted">Manage CUPS print queues. Users can submit jobs to any enabled printer.</small>
+                    <div>
+                      <button class="btn btn-sm btn-outline-secondary me-1" (click)="loadPrinters()" [disabled]="printersLoading">
+                        <fa-icon [icon]="faSearch" class="me-1" /> Refresh
+                      </button>
+                      <button class="btn btn-sm btn-success" (click)="openAddWizard()">
+                        <fa-icon [icon]="faPlus" class="me-1" /> Add Printer
                       </button>
                     </div>
-                  </form>
+                  </div>
                   @if (printersLoading) {
                     <div class="text-center py-4"><span class="spinner-border spinner-border-sm"></span> Loading…</div>
                   } @else {
@@ -401,22 +399,59 @@ interface SettingEntry {
                       <thead>
                         <tr>
                           <th>Name</th>
-                          <th>Status</th>
+                          <th>State</th>
                           <th>URI</th>
-                          <th style="width:60px"></th>
+                          <th class="text-center">Reachable</th>
+                          <th style="width:180px" class="text-end">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         @if (printers.length === 0) {
-                          <tr><td colspan="4" class="text-center text-muted py-3">No printers configured.</td></tr>
+                          <tr><td colspan="5" class="text-center text-muted py-3">No printers configured.</td></tr>
                         }
                         @for (p of printers; track p.name) {
                           <tr>
                             <td class="small fw-semibold">{{ p.name }}</td>
-                            <td class="small">{{ p.status }}</td>
-                            <td class="small text-muted">{{ p.uri }}</td>
-                            <td>
-                              <button class="btn btn-sm btn-outline-danger" (click)="deletePrinter(p.name)" [disabled]="printersBusy">
+                            <td class="small">
+                              @if (p.enabled) {
+                                <span class="badge bg-success">enabled</span>
+                              } @else {
+                                <span class="badge bg-secondary">disabled</span>
+                              }
+                              @if (!p.accepting) {
+                                <span class="badge bg-warning text-dark ms-1">not accepting</span>
+                              }
+                            </td>
+                            <td class="small text-muted text-truncate" style="max-width:300px" [title]="p.uri">{{ p.uri }}</td>
+                            <td class="text-center">
+                              @if (p.reachable === undefined) {
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-2" (click)="pingPrinter(p.name)" [disabled]="printersBusy" title="Test reachability">
+                                  <fa-icon [icon]="faSearch" />
+                                </button>
+                              } @else if (p.reachable) {
+                                <span class="badge bg-success" [title]="p.pingMsg || ''">
+                                  <fa-icon [icon]="faCircleCheck" /> ok
+                                </span>
+                              } @else {
+                                <span class="badge bg-danger" [title]="p.pingMsg || ''">
+                                  <fa-icon [icon]="faCircleXmark" /> down
+                                </span>
+                              }
+                            </td>
+                            <td class="text-end">
+                              @if (p.enabled) {
+                                <button class="btn btn-sm btn-outline-warning me-1" (click)="togglePrinter(p.name, false)" [disabled]="printersBusy" title="Disable">
+                                  <fa-icon [icon]="faToggleOff" />
+                                </button>
+                              } @else {
+                                <button class="btn btn-sm btn-outline-success me-1" (click)="togglePrinter(p.name, true)" [disabled]="printersBusy" title="Enable">
+                                  <fa-icon [icon]="faToggleOn" />
+                                </button>
+                              }
+                              <button class="btn btn-sm btn-outline-primary me-1" (click)="openModifyPrinter(p)" [disabled]="printersBusy" title="Modify">
+                                <fa-icon [icon]="faPenToSquare" />
+                              </button>
+                              <button class="btn btn-sm btn-outline-danger" (click)="deletePrinter(p.name)" [disabled]="printersBusy" title="Remove">
                                 <fa-icon [icon]="faTrashCan" />
                               </button>
                             </td>
@@ -428,6 +463,184 @@ interface SettingEntry {
                 </div>
                 <div class="modal-footer py-1">
                   <button class="btn btn-sm btn-secondary" (click)="showPrinters = false">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Add Printer Wizard -->
+        @if (showAddPrinterWizard) {
+          <div class="modal fade show d-block" style="background:rgba(0,0,0,0.5);z-index:10001">
+            <div class="modal-dialog modal-lg">
+              <div class="modal-content">
+                <div class="modal-header py-2">
+                  <h6 class="modal-title">
+                    <fa-icon [icon]="faPlus" class="me-2" /> Add Printer — Step {{ wizardStep === 'connection' ? '1' : wizardStep === 'device' ? '2' : '3' }} of 3
+                  </h6>
+                  <button class="btn-close" (click)="showAddPrinterWizard = false"></button>
+                </div>
+                <div class="modal-body">
+                  @if (wizardStep === 'connection') {
+                    <p class="small text-muted">How is this printer connected?</p>
+                    <div class="list-group">
+                      <button class="list-group-item list-group-item-action" [class.active]="wizardConnType === 'pdf'" (click)="wizardConnType = 'pdf'">
+                        <fa-icon [icon]="faPrint" class="me-2" /> <strong>Virtual (cups-pdf)</strong>
+                        <div class="small text-muted">Shadow PDF queue — every job is captured as a PDF in the user's print history. Default for new servers.</div>
+                      </button>
+                      <button class="list-group-item list-group-item-action" [class.active]="wizardConnType === 'usb'" (click)="wizardConnType = 'usb'; loadWizardDevices()">
+                        <fa-icon [icon]="faUsb" class="me-2" /> <strong>USB</strong>
+                        <div class="small text-muted">Printer plugged directly into the host. Choose the device URI on the next step.</div>
+                      </button>
+                      <button class="list-group-item list-group-item-action" [class.active]="wizardConnType === 'socket'" (click)="wizardConnType = 'socket'">
+                        <fa-icon [icon]="faNetworkWired" class="me-2" /> <strong>Network — JetDirect / AppSocket (TCP 9100)</strong>
+                        <div class="small text-muted">Most network printers. URI looks like <code>socket://192.168.1.10:9100</code>.</div>
+                      </button>
+                      <button class="list-group-item list-group-item-action" [class.active]="wizardConnType === 'ipp'" (click)="wizardConnType = 'ipp'">
+                        <fa-icon [icon]="faGlobe" class="me-2" /> <strong>IPP (port 631)</strong>
+                        <div class="small text-muted">Modern network/AirPrint printers. URI: <code>ipp://host[:631]/printers/QUEUE</code>.</div>
+                      </button>
+                      <button class="list-group-item list-group-item-action" [class.active]="wizardConnType === 'ipps'" (click)="wizardConnType = 'ipps'">
+                        <fa-icon [icon]="faGlobe" class="me-2" /> <strong>IPPS (encrypted IPP)</strong>
+                        <div class="small text-muted">URI: <code>ipps://host/ipp/print</code>.</div>
+                      </button>
+                      <button class="list-group-item list-group-item-action" [class.active]="wizardConnType === 'lpd'" (click)="wizardConnType = 'lpd'">
+                        <fa-icon [icon]="faServer" class="me-2" /> <strong>LPD / LPR</strong>
+                        <div class="small text-muted">Legacy Unix-style print server. URI: <code>lpd://host/queue</code>.</div>
+                      </button>
+                      <button class="list-group-item list-group-item-action" [class.active]="wizardConnType === 'manual'" (click)="wizardConnType = 'manual'">
+                        <fa-icon [icon]="faGear" class="me-2" /> <strong>Manual URI</strong>
+                        <div class="small text-muted">Paste any device URI you want — for advanced backends.</div>
+                      </button>
+                    </div>
+                  } @else if (wizardStep === 'device') {
+                    @if (wizardConnType === 'usb') {
+                      <p class="small text-muted">Detected USB devices (from <code>lpinfo -v</code>):</p>
+                      @if (wizardDevicesLoading) {
+                        <div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> Probing…</div>
+                      } @else {
+                        @if (wizardDevices.length === 0) {
+                          <div class="alert alert-warning small">No USB printers detected by the container. Make sure the device is plugged in and visible to the host.</div>
+                        }
+                        <div class="list-group">
+                          @for (d of wizardDevices; track d.uri) {
+                            <button class="list-group-item list-group-item-action small font-monospace" [class.active]="wizardSelectedDeviceUri === d.uri" (click)="wizardSelectedDeviceUri = d.uri">
+                              {{ d.uri }}
+                            </button>
+                          }
+                        </div>
+                      }
+                    } @else if (wizardConnType === 'pdf') {
+                      <div class="alert alert-info small mb-0">The cups-pdf virtual queue does not require a device — the URI will be <code>cups-pdf:/</code>.</div>
+                    } @else if (wizardConnType === 'manual') {
+                      <label class="form-label small mb-0">Device URI</label>
+                      <input type="text" class="form-control" [(ngModel)]="wizardManualUri" placeholder="e.g. socket://printer.lan:9100">
+                    } @else {
+                      <div class="row g-2">
+                        <div class="col-md-9">
+                          <label class="form-label small mb-0">Host or IP address</label>
+                          <input type="text" class="form-control" [(ngModel)]="wizardHost" placeholder="192.168.1.10 or printer.lan">
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label small mb-0">Port (optional)</label>
+                          <input type="number" class="form-control" [(ngModel)]="wizardPort" [placeholder]="wizardConnType === 'socket' ? '9100' : wizardConnType === 'lpd' ? '515' : '631'">
+                        </div>
+                      </div>
+                      @if (wizardConnType === 'lpd') {
+                        <div class="mt-2">
+                          <label class="form-label small mb-0">Remote queue name (optional)</label>
+                          <input type="text" class="form-control" [(ngModel)]="wizardManualUri" placeholder="lp">
+                        </div>
+                      }
+                      @if (wizardConnType === 'ipp' || wizardConnType === 'ipps') {
+                        <div class="mt-2">
+                          <label class="form-label small mb-0">URI path (optional, default <code>/ipp/print</code>)</label>
+                          <input type="text" class="form-control" [(ngModel)]="wizardManualUri" placeholder="/ipp/print">
+                        </div>
+                      }
+                      <div class="mt-2">
+                        <small class="text-muted">Computed URI: <code>{{ computedWizardUri() }}</code></small>
+                      </div>
+                    }
+                  } @else if (wizardStep === 'details') {
+                    <div class="mb-2">
+                      <label class="form-label small mb-0">Printer name (alphanumeric, dash, underscore)</label>
+                      <input type="text" class="form-control" [(ngModel)]="newPrinterName" placeholder="HP_LaserJet">
+                    </div>
+                    <div class="mb-2">
+                      <label class="form-label small mb-0">Description</label>
+                      <input type="text" class="form-control" [(ngModel)]="wizardDescription" placeholder="HP LaserJet in the office">
+                    </div>
+                    <div class="mb-2">
+                      <label class="form-label small mb-0">Location</label>
+                      <input type="text" class="form-control" [(ngModel)]="wizardLocation" placeholder="Office 2.04">
+                    </div>
+                    <div class="mb-2">
+                      <label class="form-label small mb-0">Driver (PPD)</label>
+                      @if (wizardDriversLoading) {
+                        <div class="small text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Loading drivers…</div>
+                      } @else {
+                        <select class="form-select" [(ngModel)]="wizardSelectedPpd">
+                          <option value="/usr/share/ppd/cups-pdf/CUPS-PDF_opt.ppd">CUPS-PDF (generic PDF — recommended for shadow capture)</option>
+                          <option value="raw">raw (pass-through, no driver)</option>
+                          @for (d of wizardDrivers; track d.ppd) {
+                            <option [value]="d.ppd">{{ d.description }}</option>
+                          }
+                        </select>
+                      }
+                    </div>
+                    <div class="alert alert-info small mb-0">
+                      Final URI: <code>{{ finalWizardUri() }}</code>
+                    </div>
+                  }
+                </div>
+                <div class="modal-footer py-1">
+                  @if (wizardStep !== 'connection') {
+                    <button class="btn btn-sm btn-outline-secondary" (click)="wizardBack()">Back</button>
+                  }
+                  @if (wizardStep !== 'details') {
+                    <button class="btn btn-sm btn-primary" (click)="wizardNext()" [disabled]="!wizardCanAdvance()">Next</button>
+                  } @else {
+                    <button class="btn btn-sm btn-success" (click)="submitAddPrinter()" [disabled]="!newPrinterName || printersBusy">
+                      <fa-icon [icon]="faPlus" class="me-1" /> Create
+                    </button>
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Modify Printer Modal -->
+        @if (showModifyPrinter) {
+          <div class="modal fade show d-block" style="background:rgba(0,0,0,0.5);z-index:10001">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <div class="modal-header py-2">
+                  <h6 class="modal-title">
+                    <fa-icon [icon]="faPenToSquare" class="me-2" /> Modify "{{ modifyName }}"
+                  </h6>
+                  <button class="btn-close" (click)="showModifyPrinter = false"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="mb-2">
+                    <label class="form-label small mb-0">Device URI</label>
+                    <input type="text" class="form-control" [(ngModel)]="modifyUri">
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label small mb-0">Description</label>
+                    <input type="text" class="form-control" [(ngModel)]="modifyDescription">
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label small mb-0">Location</label>
+                    <input type="text" class="form-control" [(ngModel)]="modifyLocation">
+                  </div>
+                </div>
+                <div class="modal-footer py-1">
+                  <button class="btn btn-sm btn-secondary" (click)="showModifyPrinter = false">Cancel</button>
+                  <button class="btn btn-sm btn-primary" (click)="submitModifyPrinter()" [disabled]="printersBusy">
+                    <fa-icon [icon]="faFloppyDisk" class="me-1" /> Save
+                  </button>
                 </div>
               </div>
             </div>
@@ -764,6 +977,15 @@ export class AdminPanelComponent implements OnInit {
   faPrint = faPrint;
   faPlus = faPlus;
   faChartBar = faChartBar;
+  faArrowLeft = faArrowLeft;
+  faCircleCheck = faCircleCheck;
+  faCircleXmark = faCircleXmark;
+  faPenToSquare = faPenToSquare;
+  faSearch = faSearch;
+  faNetworkWired = faNetworkWired;
+  faUsb = faUsb;
+  faServer = faServer;
+  faGlobe = faGlobe;
 
   users: UserRecord[] = [];
   filteredUsers: UserRecord[] = [];
@@ -813,11 +1035,32 @@ export class AdminPanelComponent implements OnInit {
   showPrinters = false;
   printersLoading = false;
   printersBusy = false;
-  printers: { name: string; status: string; uri: string }[] = [];
+  printers: { name: string; status: string; uri: string; enabled: boolean; accepting: boolean; reachable?: boolean; pingMsg?: string }[] = [];
   newPrinterName = '';
   newPrinterUri = '';
   printersStatusMsg = '';
   printersStatusErr = false;
+  // Add-printer wizard state
+  showAddPrinterWizard = false;
+  wizardStep: 'connection' | 'device' | 'details' = 'connection';
+  wizardConnType: 'usb' | 'socket' | 'ipp' | 'ipps' | 'lpd' | 'pdf' | 'manual' = 'pdf';
+  wizardDevices: { class: string; uri: string }[] = [];
+  wizardDevicesLoading = false;
+  wizardSelectedDeviceUri = '';
+  wizardHost = '';
+  wizardPort = 0;
+  wizardManualUri = '';
+  wizardDrivers: { ppd: string; description: string }[] = [];
+  wizardDriversLoading = false;
+  wizardSelectedPpd = '/usr/share/ppd/cups-pdf/CUPS-PDF_opt.ppd';
+  wizardDescription = '';
+  wizardLocation = '';
+  // Modify state
+  showModifyPrinter = false;
+  modifyName = '';
+  modifyUri = '';
+  modifyDescription = '';
+  modifyLocation = '';
 
   // Admin stats state
   showAdminStatsModal = false;
@@ -1370,22 +1613,169 @@ export class AdminPanelComponent implements OnInit {
 
   loadPrinters() {
     this.printersLoading = true;
-    this.http.get<{ printers: { name: string; status: string; uri: string }[] }>('api/admin/printers').subscribe({
+    this.http.get<{ printers: { name: string; status: string; uri: string; enabled: boolean; accepting: boolean }[] }>('api/admin/printers').subscribe({
       next: (res) => { this.printersLoading = false; this.printers = res.printers || []; },
       error: () => { this.printersLoading = false; this.showPrintersStatus('Failed to load printers.', true); },
     });
   }
 
-  addPrinter() {
-    if (!this.newPrinterName || !this.newPrinterUri) return;
+  pingPrinter(name: string) {
+    this.printersBusy = true;
+    this.http.get<{ reachable: boolean; msg: string }>(`api/admin/printers/${encodeURIComponent(name)}/ping`).subscribe({
+      next: (res) => {
+        this.printersBusy = false;
+        const p = this.printers.find(x => x.name === name);
+        if (p) { p.reachable = res.reachable; p.pingMsg = res.msg; }
+      },
+      error: () => { this.printersBusy = false; this.showPrintersStatus('Ping failed.', true); },
+    });
+  }
+
+  togglePrinter(name: string, enable: boolean) {
+    this.printersBusy = true;
+    const url = `api/admin/printers/${encodeURIComponent(name)}/${enable ? 'enable' : 'disable'}`;
+    this.http.post<{ status: string; msg: string }>(url, {}).subscribe({
+      next: (res) => {
+        this.printersBusy = false;
+        if (res.status === 'ok') { this.showPrintersStatus(res.msg); this.loadPrinters(); }
+        else { this.showPrintersStatus(res.msg, true); }
+      },
+      error: (err: any) => { this.printersBusy = false; this.showPrintersStatus(err?.error?.msg || 'Error.', true); },
+    });
+  }
+
+  openModifyPrinter(p: { name: string; uri: string }) {
+    this.modifyName = p.name;
+    this.modifyUri = p.uri;
+    this.modifyDescription = '';
+    this.modifyLocation = '';
+    this.showModifyPrinter = true;
+  }
+
+  submitModifyPrinter() {
+    this.printersBusy = true;
+    const body: any = {};
+    if (this.modifyUri) body.uri = this.modifyUri;
+    if (this.modifyDescription) body.description = this.modifyDescription;
+    if (this.modifyLocation) body.location = this.modifyLocation;
+    this.http.put<{ status: string; msg: string }>(`api/admin/printers/${encodeURIComponent(this.modifyName)}`, body).subscribe({
+      next: (res) => {
+        this.printersBusy = false;
+        if (res.status === 'ok') {
+          this.showModifyPrinter = false;
+          this.showPrintersStatus(res.msg);
+          this.loadPrinters();
+        } else {
+          this.showPrintersStatus(res.msg, true);
+        }
+      },
+      error: (err: any) => { this.printersBusy = false; this.showPrintersStatus(err?.error?.msg || 'Error.', true); },
+    });
+  }
+
+  openAddWizard() {
+    this.showAddPrinterWizard = true;
+    this.wizardStep = 'connection';
+    this.wizardConnType = 'pdf';
+    this.wizardDevices = [];
+    this.wizardSelectedDeviceUri = '';
+    this.wizardHost = '';
+    this.wizardPort = 0;
+    this.wizardManualUri = '';
+    this.wizardDescription = '';
+    this.wizardLocation = '';
+    this.wizardSelectedPpd = '/usr/share/ppd/cups-pdf/CUPS-PDF_opt.ppd';
+    this.newPrinterName = '';
+    if (this.wizardDrivers.length === 0) {
+      this.wizardDriversLoading = true;
+      this.http.get<{ drivers: { ppd: string; description: string }[] }>('api/admin/printers/drivers').subscribe({
+        next: (res) => { this.wizardDriversLoading = false; this.wizardDrivers = (res.drivers || []).slice(0, 500); },
+        error: () => { this.wizardDriversLoading = false; },
+      });
+    }
+  }
+
+  loadWizardDevices() {
+    this.wizardDevicesLoading = true;
+    this.http.get<{ devices: { class: string; uri: string }[] }>('api/admin/printers/devices').subscribe({
+      next: (res) => {
+        this.wizardDevicesLoading = false;
+        this.wizardDevices = (res.devices || []).filter(d => d.uri.startsWith('usb:'));
+      },
+      error: () => { this.wizardDevicesLoading = false; this.wizardDevices = []; },
+    });
+  }
+
+  computedWizardUri(): string {
+    const host = this.wizardHost.trim();
+    if (!host) return '(enter host first)';
+    const port = this.wizardPort && this.wizardPort > 0 ? this.wizardPort : null;
+    switch (this.wizardConnType) {
+      case 'socket': return `socket://${host}${port ? ':' + port : ':9100'}`;
+      case 'lpd': {
+        const q = (this.wizardManualUri || 'lp').replace(/^\//, '');
+        return `lpd://${host}${port ? ':' + port : ''}/${q}`;
+      }
+      case 'ipp':
+      case 'ipps': {
+        const path = this.wizardManualUri || '/ipp/print';
+        const p = path.startsWith('/') ? path : '/' + path;
+        return `${this.wizardConnType}://${host}${port ? ':' + port : ''}${p}`;
+      }
+      default: return '';
+    }
+  }
+
+  finalWizardUri(): string {
+    switch (this.wizardConnType) {
+      case 'pdf': return 'cups-pdf:/';
+      case 'usb': return this.wizardSelectedDeviceUri || '(no device selected)';
+      case 'manual': return this.wizardManualUri || '(empty)';
+      default: return this.computedWizardUri();
+    }
+  }
+
+  wizardCanAdvance(): boolean {
+    if (this.wizardStep === 'connection') return true;
+    if (this.wizardStep === 'device') {
+      switch (this.wizardConnType) {
+        case 'pdf': return true;
+        case 'usb': return !!this.wizardSelectedDeviceUri;
+        case 'manual': return !!this.wizardManualUri.trim();
+        default: return !!this.wizardHost.trim();
+      }
+    }
+    return false;
+  }
+
+  wizardNext() {
+    if (this.wizardStep === 'connection') this.wizardStep = 'device';
+    else if (this.wizardStep === 'device') this.wizardStep = 'details';
+  }
+
+  wizardBack() {
+    if (this.wizardStep === 'details') this.wizardStep = 'device';
+    else if (this.wizardStep === 'device') this.wizardStep = 'connection';
+  }
+
+  submitAddPrinter() {
+    const uri = this.finalWizardUri();
+    if (!uri || uri.startsWith('(')) {
+      this.showPrintersStatus('Invalid URI.', true);
+      return;
+    }
     this.printersBusy = true;
     this.http.post<{ status: string; msg: string }>('api/admin/printers', {
-      name: this.newPrinterName, uri: this.newPrinterUri
+      name: this.newPrinterName,
+      uri,
+      description: this.wizardDescription || this.newPrinterName,
+      location: this.wizardLocation,
+      ppd: this.wizardSelectedPpd,
     }).subscribe({
       next: (res) => {
         this.printersBusy = false;
         if (res.status === 'ok') {
-          this.newPrinterName = ''; this.newPrinterUri = '';
+          this.showAddPrinterWizard = false;
           this.showPrintersStatus('Printer added.');
           this.loadPrinters();
         } else {

@@ -47,6 +47,7 @@ class PrintJob:
     pages: int = 0
     size: int = 0          # bytes
     printer: str = ''      # CUPS queue name
+    color_mode: str = 'unknown'  # 'color' | 'mono' | 'unknown'
     status: str = 'finished'   # finished | failed
     error: str = ''
     timestamp: float = field(default_factory=time.time)
@@ -106,6 +107,52 @@ def count_pdf_pages(pdf_path: str) -> int:
         log.warning(f'gs page count failed for {pdf_path}: {exc}')
 
     return 0
+
+
+def detect_color_mode(pdf_path: str) -> str:
+    """Return 'color', 'mono', or 'unknown'.
+
+    Uses pdfimages -list to inspect embedded image colorspaces, then falls back
+    to ghostscript ink-coverage analysis on the first page. Best-effort only —
+    text-only PDFs in dark blue type may still report 'color' because Postscript
+    color operators were used.
+    """
+    # 1. pdfimages -list: header line + per-image rows including a 'color' column.
+    try:
+        out = subprocess.run(
+            ['pdfimages', '-list', pdf_path],
+            capture_output=True, text=True, timeout=20, check=True,
+        ).stdout
+        any_image = False
+        for line in out.splitlines()[2:]:   # skip header + dashes
+            parts = line.split()
+            if len(parts) < 6:
+                continue
+            any_image = True
+            color = parts[5].lower()
+            if color in ('rgb', 'cmyk', 'icc', 'lab', 'index'):
+                return 'color'
+        if any_image:
+            return 'mono'
+    except (FileNotFoundError, subprocess.SubprocessError) as exc:
+        log.debug(f'pdfimages failed for {pdf_path}: {exc}')
+    # 2. ghostscript ink coverage: any nonzero C/M/Y => color
+    try:
+        out = subprocess.run(
+            ['gs', '-q', '-o', '-', '-sDEVICE=inkcov',
+             '-dFirstPage=1', '-dLastPage=1', pdf_path],
+            capture_output=True, text=True, timeout=20, check=True,
+        ).stdout
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) >= 4 and parts[-1] == 'CMYK':
+                c, m, y, _k = (float(parts[i]) for i in range(4))
+                if c > 0.0 or m > 0.0 or y > 0.0:
+                    return 'color'
+                return 'mono'
+    except (FileNotFoundError, subprocess.SubprocessError, ValueError) as exc:
+        log.debug(f'gs inkcov failed for {pdf_path}: {exc}')
+    return 'unknown'
 
 
 # ---------------------------------------------------------------------------
@@ -223,11 +270,12 @@ class PrintCapture:
             pages=pages,
             size=size,
             printer=printer,
+            color_mode=detect_color_mode(target_path),
             status='finished',
         )
         log.info(
             f'[{username}] captured print "{title}" -> {target_path} '
-            f'({pages} pages, {size} bytes)'
+            f'({pages} pages, {size} bytes, {job.color_mode})'
         )
 
         # Persist in the per-user print log
@@ -240,6 +288,7 @@ class PrintCapture:
                     pages=job.pages,
                     size=job.size,
                     printer=job.printer,
+                    color_mode=job.color_mode,
                     status=job.status,
                 )
             except Exception as exc:

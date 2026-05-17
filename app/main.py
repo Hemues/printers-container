@@ -48,8 +48,14 @@ auth / admin / log / 2FA flows identical):
     GET    /printings/{username}/{filename}      (auth: owner or admin)
 
   CUPS / Samba admin
-    GET    /api/admin/printers                   (list cups queues)
-    POST   /api/admin/printers                   (create cups-pdf queue)
+    GET    /api/admin/printers                   (list cups queues, structured)
+    GET    /api/admin/printers/devices           (lpinfo -v — discover URIs)
+    GET    /api/admin/printers/drivers           (lpinfo -m — list PPDs)
+    GET    /api/admin/printers/{name}/ping       (probe reachability)
+    POST   /api/admin/printers                   (create queue)
+    PUT    /api/admin/printers/{name}            (modify queue)
+    POST   /api/admin/printers/{name}/enable     (cupsenable + cupsaccept)
+    POST   /api/admin/printers/{name}/disable    (cupsdisable)
     DELETE /api/admin/printers/{name}            (delete cups queue)
 
   Socket.IO  (rooms keyed by username)
@@ -772,12 +778,188 @@ def _run(cmd: list[str], timeout: int = 30) -> tuple[int, str, str]:
         return 124, '', 'timeout'
 
 
+def _parse_lpstat_printers() -> list[dict]:
+    """Parse `lpstat -p -v` to a structured list."""
+    rc_p, out_p, _ = _run(['lpstat', '-p'])
+    rc_v, out_v, _ = _run(['lpstat', '-v'])
+    printers: dict[str, dict] = {}
+    # `lpstat -p` lines: "printer <name> is idle/disabled.  enabled since ..."
+    for line in (out_p or '').splitlines():
+        if not line.startswith('printer '):
+            continue
+        parts = line.split(maxsplit=3)
+        if len(parts) < 4:
+            continue
+        name = parts[1]
+        state_word = parts[3].rstrip('.').lower()
+        enabled = 'disabled' not in state_word
+        printers[name] = {
+            'name': name,
+            'status': state_word,
+            'enabled': enabled,
+            'uri': '',
+            'accepting': True,
+        }
+    # `lpstat -v` lines: "device for <name>: <uri>"
+    for line in (out_v or '').splitlines():
+        if not line.startswith('device for '):
+            continue
+        rest = line[len('device for '):]
+        if ':' not in rest:
+            continue
+        name, uri = rest.split(':', 1)
+        name = name.strip()
+        uri = uri.strip()
+        printers.setdefault(name, {'name': name, 'status': 'unknown', 'enabled': True, 'accepting': True})
+        printers[name]['uri'] = uri
+    # `lpstat -a` lines: "<name> accepting requests since ..." or "not accepting"
+    rc_a, out_a, _ = _run(['lpstat', '-a'])
+    for line in (out_a or '').splitlines():
+        parts = line.split(maxsplit=1)
+        if not parts:
+            continue
+        name = parts[0]
+        rest = (parts[1] if len(parts) > 1 else '').lower()
+        if name in printers:
+            printers[name]['accepting'] = 'not accepting' not in rest
+    return list(printers.values())
+
+
+def _printer_uri_reachable(uri: str, timeout: float = 2.0) -> dict:
+    """Best-effort reachability test for a CUPS device URI."""
+    import socket
+    from urllib.parse import urlparse
+    if not uri:
+        return {'reachable': False, 'msg': 'no URI'}
+    # Local/virtual backends are always reachable
+    if uri.startswith(('cups-pdf:', 'file:', 'pipe:')):
+        return {'reachable': True, 'msg': 'local'}
+    if uri.startswith('usb:'):
+        # USB device URI like usb://HP/LaserJet?serial=...
+        return {'reachable': True, 'msg': 'usb (cannot verify from container)'}
+    try:
+        if uri.startswith('socket://'):
+            p = urlparse(uri)
+            host = p.hostname or ''
+            port = p.port or 9100
+            with socket.create_connection((host, port), timeout=timeout):
+                return {'reachable': True, 'msg': f'tcp {host}:{port} ok'}
+        if uri.startswith(('http://', 'https://', 'ipp://', 'ipps://')):
+            p = urlparse(uri.replace('ipp://', 'http://').replace('ipps://', 'https://'))
+            host = p.hostname or ''
+            port = p.port or (443 if uri.startswith(('https://', 'ipps://')) else 631)
+            with socket.create_connection((host, port), timeout=timeout):
+                return {'reachable': True, 'msg': f'tcp {host}:{port} ok'}
+        if uri.startswith('lpd://'):
+            p = urlparse(uri)
+            host = p.hostname or ''
+            port = p.port or 515
+            with socket.create_connection((host, port), timeout=timeout):
+                return {'reachable': True, 'msg': f'tcp {host}:{port} ok'}
+    except (socket.gaierror, socket.timeout, OSError) as exc:
+        return {'reachable': False, 'msg': str(exc)}
+    return {'reachable': False, 'msg': 'unknown scheme'}
+
+
 @routes.get(config.URL_PREFIX + 'api/admin/printers')
 async def api_admin_list_printers(request):
     _require_admin(request)
-    rc, out, err = _run(['lpstat', '-p', '-d'])
+    printers = _parse_lpstat_printers()
+    return web.json_response({'status': 'ok', 'printers': printers})
+
+
+@routes.get(config.URL_PREFIX + 'api/admin/printers/devices')
+async def api_admin_list_devices(request):
+    """`lpinfo -v` — list candidate device URIs for the add-wizard."""
+    _require_admin(request)
+    rc, out, err = _run(['lpinfo', '-v'])
+    devices = []
+    for line in (out or '').splitlines():
+        # Lines: "<class> <uri>"  e.g. "network socket", "direct usb://HP/LaserJet?serial=..."
+        parts = line.split(None, 1)
+        if len(parts) == 2:
+            devices.append({'class': parts[0], 'uri': parts[1].strip()})
     return web.json_response({'status': 'ok' if rc == 0 else 'error',
-                              'stdout': out, 'stderr': err, 'returncode': rc})
+                              'devices': devices, 'stderr': err})
+
+
+@routes.get(config.URL_PREFIX + 'api/admin/printers/drivers')
+async def api_admin_list_drivers(request):
+    """`lpinfo -m` — list available PPD/driver identifiers."""
+    _require_admin(request)
+    rc, out, err = _run(['lpinfo', '-m'], timeout=60)
+    drivers = []
+    for line in (out or '').splitlines():
+        parts = line.split(None, 1)
+        if len(parts) == 2:
+            drivers.append({'ppd': parts[0], 'description': parts[1].strip()})
+    return web.json_response({'status': 'ok' if rc == 0 else 'error',
+                              'drivers': drivers, 'stderr': err})
+
+
+@routes.get(config.URL_PREFIX + 'api/admin/printers/{name}/ping')
+async def api_admin_ping_printer(request):
+    _require_admin(request)
+    name = request.match_info['name']
+    rc, out, _ = _run(['lpstat', '-v', name])
+    uri = ''
+    for line in (out or '').splitlines():
+        if line.startswith('device for '):
+            rest = line[len('device for '):]
+            if ':' in rest:
+                uri = rest.split(':', 1)[1].strip()
+                break
+    if not uri:
+        return web.json_response({'status': 'error', 'msg': 'printer not found'}, status=404)
+    result = _printer_uri_reachable(uri)
+    return web.json_response({'status': 'ok', 'uri': uri, **result})
+
+
+@routes.post(config.URL_PREFIX + 'api/admin/printers/{name}/enable')
+async def api_admin_enable_printer(request):
+    _require_admin(request)
+    name = request.match_info['name']
+    rc1, _, err1 = _run(['cupsenable', name])
+    rc2, _, err2 = _run(['cupsaccept', name])
+    if rc1 != 0 or rc2 != 0:
+        return web.json_response({'status': 'error', 'msg': err1 or err2}, status=500)
+    return web.json_response({'status': 'ok', 'msg': f'Printer "{name}" enabled.'})
+
+
+@routes.post(config.URL_PREFIX + 'api/admin/printers/{name}/disable')
+async def api_admin_disable_printer(request):
+    _require_admin(request)
+    name = request.match_info['name']
+    rc1, _, err1 = _run(['cupsdisable', name])
+    if rc1 != 0:
+        return web.json_response({'status': 'error', 'msg': err1}, status=500)
+    return web.json_response({'status': 'ok', 'msg': f'Printer "{name}" disabled.'})
+
+
+@routes.put(config.URL_PREFIX + 'api/admin/printers/{name}')
+async def api_admin_modify_printer(request):
+    _require_admin(request)
+    name = request.match_info['name']
+    post = await request.json()
+    cmd = ['lpadmin', '-p', name]
+    if 'uri' in post and post['uri']:
+        cmd.extend(['-v', post['uri']])
+    if 'description' in post:
+        cmd.extend(['-D', post['description']])
+    if 'location' in post:
+        cmd.extend(['-L', post['location']])
+    if 'ppd' in post and post['ppd']:
+        ppd = post['ppd']
+        if os.path.isfile(ppd):
+            cmd.extend(['-P', ppd])
+        else:
+            cmd.extend(['-m', ppd])
+    if len(cmd) <= 3:
+        return web.json_response({'status': 'error', 'msg': 'No changes provided.'}, status=400)
+    rc, out, err = _run(cmd)
+    if rc != 0:
+        return web.json_response({'status': 'error', 'msg': err or out}, status=500)
+    return web.json_response({'status': 'ok', 'msg': f'Printer "{name}" updated.'})
 
 
 @routes.post(config.URL_PREFIX + 'api/admin/printers')
@@ -787,8 +969,8 @@ async def api_admin_create_printer(request):
     name = (post.get('name') or '').strip()
     description = post.get('description', name)
     location = post.get('location', '')
-    # Backend: 'cups-pdf' for virtual shadow queue or any other supported URI.
-    backend = post.get('backend', 'cups-pdf:/')
+    # Backend: explicit URI (socket://..., ipp://..., usb://..., lpd://..., cups-pdf:/).
+    backend = post.get('backend') or post.get('uri') or 'cups-pdf:/'
     ppd = post.get('ppd', '/usr/share/ppd/cups-pdf/CUPS-PDF_opt.ppd')
     if not name or not name.replace('_', '').replace('-', '').isalnum():
         return web.json_response({'status': 'error',

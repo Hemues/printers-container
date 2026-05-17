@@ -1814,7 +1814,8 @@ def remove_smb_user(username: str) -> bool:
 # ---------------------------------------------------------------------------
 def append_print_log(username: str, title: str, filename: str,
                      pages: int = 0, size: int = 0,
-                     printer: str = '', status: str = 'finished'):
+                     printer: str = '', color_mode: str = 'unknown',
+                     status: str = 'finished'):
     """Append a print job entry to per-user log + global log.
 
     Schema kept JSON-compatible with the Printers logs so the existing
@@ -1832,6 +1833,8 @@ def append_print_log(username: str, title: str, filename: str,
         'filename': filename,
         'username': username,
         'pages': int(pages or 0),
+        'printer': printer,
+        'color_mode': color_mode,
         'status': status,
     }
     line = json.dumps(entry, ensure_ascii=False) + '\n'

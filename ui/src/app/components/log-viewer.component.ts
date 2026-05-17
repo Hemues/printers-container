@@ -13,6 +13,8 @@ interface LogEntry {
   filename: string;
   username: string;
   pages: number;
+  printer: string;
+  color_mode: string;
   status: string;
   file_exists: boolean;
   checked: boolean;
@@ -68,6 +70,24 @@ interface LogEntry {
                         (ngModelChange)="applyFilters()">
                     </div>
                   </th>
+                  <th style="width: 140px;">
+                    <div class="d-flex align-items-center gap-1">
+                      <fa-icon [icon]="faSearch" class="text-muted" style="font-size:0.75em" />
+                      <input type="text" class="form-control form-control-sm"
+                        placeholder="Printer"
+                        [(ngModel)]="filterPrinter"
+                        (ngModelChange)="applyFilters()">
+                    </div>
+                  </th>
+                  <th style="width: 100px;">
+                    <div class="d-flex align-items-center gap-1">
+                      <fa-icon [icon]="faSearch" class="text-muted" style="font-size:0.75em" />
+                      <input type="text" class="form-control form-control-sm"
+                        placeholder="Color"
+                        [(ngModel)]="filterColor"
+                        (ngModelChange)="applyFilters()">
+                    </div>
+                  </th>
                   <th style="width: 160px;">
                     <div class="d-flex align-items-center gap-1">
                       <fa-icon [icon]="faSearch" class="text-muted" style="font-size:0.75em" />
@@ -91,7 +111,7 @@ interface LogEntry {
               <tbody>
                 @if (filteredEntries.length === 0) {
                   <tr>
-                    <td colspan="4" class="text-center text-muted py-3">
+                    <td colspan="6" class="text-center text-muted py-3">
                       @if (entries.length === 0) {
                         No log entries.
                       } @else {
@@ -116,6 +136,16 @@ interface LogEntry {
                         <a [href]="buildFileLink(entry)" target="_blank" class="text-decoration-none">{{ entry.filename }}</a>
                       } @else {
                         {{ entry.filename || entry.name }}
+                      }
+                    </td>
+                    <td class="small">{{ entry.printer || '—' }}</td>
+                    <td class="small">
+                      @if (entry.color_mode === 'color') {
+                        <span class="badge bg-info text-dark">color</span>
+                      } @else if (entry.color_mode === 'mono') {
+                        <span class="badge bg-dark">B&amp;W</span>
+                      } @else {
+                        <span class="badge bg-light text-muted">—</span>
                       }
                     </td>
                     <td class="small text-nowrap">{{ entry.datetime }}</td>
@@ -183,6 +213,8 @@ export class LogViewerComponent implements OnInit {
   statusIsError = false;
 
   filterName = '';
+  filterPrinter = '';
+  filterColor = '';
   filterDate = '';
   filterStatus = '';
 
@@ -220,12 +252,14 @@ export class LogViewerComponent implements OnInit {
         filename: entry.filename || '',
         username: entry.username || '',
         pages: Number(entry.pages || 0),
+        printer: entry.printer || entry.url || '',
+        color_mode: entry.color_mode || 'unknown',
         status: entry.status || '',
         file_exists: entry.file_exists !== false,
         checked: false,
       };
     }
-    return { url: String(entry), name: '', datetime: '', size: '', filename: '', username: '', pages: 0, status: '', file_exists: false, checked: false };
+    return { url: String(entry), name: '', datetime: '', size: '', filename: '', username: '', pages: 0, printer: '', color_mode: 'unknown', status: '', file_exists: false, checked: false };
   }
 
   buildFileLink(entry: LogEntry): string {
@@ -240,6 +274,14 @@ export class LogViewerComponent implements OnInit {
     if (this.filterName) {
       const lower = this.filterName.toLowerCase();
       result = result.filter(e => (e.filename || e.name).toLowerCase().includes(lower));
+    }
+    if (this.filterPrinter) {
+      const lower = this.filterPrinter.toLowerCase();
+      result = result.filter(e => (e.printer || '').toLowerCase().includes(lower));
+    }
+    if (this.filterColor) {
+      const lower = this.filterColor.toLowerCase();
+      result = result.filter(e => (e.color_mode || '').toLowerCase().includes(lower));
     }
     if (this.filterDate) {
       const lower = this.filterDate.toLowerCase();

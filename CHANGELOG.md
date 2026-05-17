@@ -4,6 +4,53 @@ All notable changes to the printers container are documented here.
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-05-23
+
+### Added
+- **Printer Server Settings — full management UI**: the existing "CUPS Printers"
+  modal has been rewritten into a real CUPS-style admin surface.  The table now
+  has columns *Name / State / URI / Reachable / Actions* with per-row buttons to
+  enable/disable, modify, ping, or remove a queue.  An enabled queue shows a
+  green badge; disabled is grey; queues that are not accepting jobs get an
+  extra warning badge.
+- **Friendly Add-Printer wizard** (3 steps): connection type → device →
+  details.  Supported connection types: Virtual (`cups-pdf:/`), USB (auto-probed
+  via `lpinfo -v`), JetDirect/AppSocket (`socket://host:9100`), IPP, IPPS, LPD,
+  and a manual URI for advanced backends.  The wizard composes the final URI
+  for you, lets you pick a PPD/driver from the live `lpinfo -m` list, and only
+  enables *Create* once the inputs are valid.
+- **Modify Printer modal**: change URI, description, and location of an
+  existing queue without removing/re-adding it.
+- **Per-printer reachability test**: a magnifying-glass icon next to each
+  printer triggers `GET /api/admin/printers/{name}/ping`, which probes the
+  TCP endpoint behind `socket://`, `ipp://`, `ipps://`, `lpd://`, or
+  `http(s)://` URIs (USB / cups-pdf are reported as locally reachable).
+- **Backend endpoints**:
+  - `GET    /api/admin/printers` now returns a structured list
+    `[{name, status, enabled, accepting, uri}]` (was: raw `lpstat` text).
+  - `GET    /api/admin/printers/devices` — `lpinfo -v` wrapper.
+  - `GET    /api/admin/printers/drivers` — `lpinfo -m` wrapper.
+  - `GET    /api/admin/printers/{name}/ping` — TCP reachability probe.
+  - `POST   /api/admin/printers/{name}/enable` — `cupsenable` + `cupsaccept`.
+  - `POST   /api/admin/printers/{name}/disable` — `cupsdisable`.
+  - `PUT    /api/admin/printers/{name}` — modify URI/description/location/PPD.
+- **Per-print colour detection**: `printer_engine.py` now records a
+  `color_mode` ∈ {`color`, `mono`, `unknown`} for every captured job by
+  inspecting embedded image colorspaces via `pdfimages -list` and falling
+  back to `gs -sDEVICE=inkcov` ink coverage on page 1.  The mode is appended
+  to the per-user print log via a new `color_mode` field.
+- **Landing-page log columns**: the `<app-log-viewer>` table now shows two
+  extra columns — *Printer* (CUPS queue name) and *Color* (badge: B&W /
+  colour / —).  Both are filterable like the existing columns.
+- **Admin back-arrow icon**: restored to a real `<fa-icon>` of `faArrowLeft`
+  (the `&larr;` workaround from 0.1.9 is no longer needed — FA7 names render
+  correctly when the FA package set is consistent with videodl, which it is).
+
+### Fixed
+- Several FA7 icons (`faPenToSquare`, `faCircleCheck`, `faCircleXmark`,
+  `faSearch`, `faNetworkWired`, `faUsb`, `faServer`, `faGlobe`) added to the
+  admin panel imports so the new icons render reliably.
+
 ## [0.1.9] - 2026-05-22
 
 ### Fixed
