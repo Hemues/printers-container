@@ -4,6 +4,17 @@ All notable changes to the printers container are documented here.
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-05-17
+
+### Fixed
+- Change Password button was unclickable in zoneless mode because
+  `[disabled]` guard depended on `ngModel` bindings that did not
+  trigger change detection reliably.  Button is now always clickable;
+  `submit()` validates all fields and shows clear per-field error
+  messages ("Please enter your current password", etc.).  Added `name`
+  attributes and `(ngModelChange)` handlers to each input for reliable
+  two-way binding.
+
 ## [0.1.12] - 2026-05-17
 
 ### Added

@@ -30,17 +30,20 @@ import { AuthService } from '../services/auth.service';
             }
             <div class="mb-2">
               <label class="form-label small mb-0">Current Password</label>
-              <input type="password" class="form-control form-control-sm" [(ngModel)]="currentPw"
+              <input type="password" class="form-control form-control-sm" name="currentPw"
+                [(ngModel)]="currentPw" (ngModelChange)="errorMsg = ''"
                 autocomplete="current-password">
             </div>
             <div class="mb-2">
               <label class="form-label small mb-0">New Password</label>
-              <input type="password" class="form-control form-control-sm" [(ngModel)]="newPw"
+              <input type="password" class="form-control form-control-sm" name="newPw"
+                [(ngModel)]="newPw" (ngModelChange)="errorMsg = ''"
                 autocomplete="new-password">
             </div>
             <div class="mb-2">
               <label class="form-label small mb-0">Confirm New Password</label>
-              <input type="password" class="form-control form-control-sm" [(ngModel)]="newPwConfirm"
+              <input type="password" class="form-control form-control-sm" name="newPwConfirm"
+                [(ngModel)]="newPwConfirm" (ngModelChange)="errorMsg = ''"
                 autocomplete="new-password">
             </div>
           </div>
@@ -48,7 +51,7 @@ import { AuthService } from '../services/auth.service';
             @if (!forceChange()) {
               <button class="btn btn-sm btn-secondary" (click)="closed.emit()">Cancel</button>
             }
-            <button class="btn btn-sm btn-primary" [disabled]="loading || !currentPw || !newPw || !newPwConfirm"
+            <button class="btn btn-sm btn-primary" [disabled]="loading"
               (click)="submit()">
               @if (loading) {
                 <span class="spinner-border spinner-border-sm me-1"></span>
@@ -77,6 +80,18 @@ export class ChangePasswordComponent {
   submit() {
     this.errorMsg = '';
     this.successMsg = '';
+    if (!this.currentPw) {
+      this.errorMsg = 'Please enter your current password.';
+      return;
+    }
+    if (!this.newPw) {
+      this.errorMsg = 'Please enter a new password.';
+      return;
+    }
+    if (!this.newPwConfirm) {
+      this.errorMsg = 'Please confirm the new password.';
+      return;
+    }
     if (this.newPw !== this.newPwConfirm) {
       this.errorMsg = 'New passwords do not match.';
       return;

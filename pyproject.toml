@@ -1,6 +1,6 @@
 [project]
 name = "printers"
-version = "0.1.12"
+version = "0.1.13"
 description = "Self-hosted print server (CUPS + Samba) with per-user shadow PDF archive and web admin UI"
 requires-python = ">=3.11"
 dependencies = [
