@@ -310,7 +310,41 @@ def index(request):
     response = web.FileResponse(os.path.join(UI_ROOT, 'index.html'))
     if 'printers_theme' not in request.cookies:
         response.set_cookie('printers_theme', config.DEFAULT_THEME)
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return response
+
+
+# Serve service-worker scripts with no-cache to ensure updates propagate
+@routes.get(config.URL_PREFIX + 'ngsw-worker.js')
+def serve_ngsw_worker(request):
+    path = os.path.join(UI_ROOT, 'ngsw-worker.js')
+    if not os.path.isfile(path):
+        return web.Response(status=404, text='Not found')
+    resp = web.FileResponse(path)
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Service-Worker-Allowed'] = '/'
+    return resp
+
+
+@routes.get(config.URL_PREFIX + 'custom-service-worker.js')
+def serve_custom_sw(request):
+    path = os.path.join(UI_ROOT, 'custom-service-worker.js')
+    if not os.path.isfile(path):
+        return web.Response(status=404, text='Not found')
+    resp = web.FileResponse(path)
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Service-Worker-Allowed'] = '/'
+    return resp
+
+
+@routes.get(config.URL_PREFIX + 'ngsw.json')
+def serve_ngsw_json(request):
+    path = os.path.join(UI_ROOT, 'ngsw.json')
+    if not os.path.isfile(path):
+        return web.Response(status=404, text='Not found')
+    resp = web.FileResponse(path)
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return resp
 
 
 @routes.get(config.URL_PREFIX + 'version')

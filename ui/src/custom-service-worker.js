@@ -1,15 +1,21 @@
 /**
- * Custom service worker for Printers app.
- * Forces immediate activation on install so new versions take effect right away.
+ * Self-unregistering service worker for Printers app.
+ * The previous SW cached stale content and prevented updates.
+ * This version unregisters itself so the app loads fresh from the server.
  */
 
-// Skip waiting phase — activate immediately when a new SW is installed
-self.addEventListener('install', () => self.skipWaiting());
-
-// Take control of all clients immediately upon activation
-self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+self.addEventListener('install', () => {
+  self.skipWaiting();
 });
 
-// Import Angular's ngsw-worker for full caching support
-importScripts("./ngsw-worker.js");
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then(names =>
+      Promise.all(names.map(name => caches.delete(name)))
+    ).then(() => self.clients.claim())
+    .then(() => self.registration.unregister())
+    .then(() => self.clients.matchAll()).then(clients => {
+      clients.forEach(client => client.navigate(client.url));
+    })
+  );
+});

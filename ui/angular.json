@@ -36,7 +36,6 @@
             "scripts": [
               "node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"
             ],
-            "serviceWorker": "ngsw-config.json",
             "browser": "src/main.ts",
             "polyfills": [
               "zone.js",

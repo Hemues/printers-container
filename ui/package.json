@@ -1,6 +1,6 @@
 {
   "name": "Printers",
-  "version": "2.0.114",
+  "version": "2.0.117",
   "pnpm": {
     "onlyBuiltDependencies": [
       "@parcel/watcher",
