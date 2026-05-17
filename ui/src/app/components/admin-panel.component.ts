@@ -2,7 +2,7 @@ import { Component, inject, OnInit, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faTrashAlt, faKey, faUserPlus, faLock, faUnlock, faTimes, faArrowLeft, faCog, faSave, faShieldAlt, faToggleOn, faToggleOff, faEnvelope, faClipboardList, faPrint, faPlus, faChartBar } from '@fortawesome/free-solid-svg-icons';
+import { faTrashCan, faKey, faUserPlus, faLock, faUnlock, faGear, faFloppyDisk, faShieldHalved, faToggleOn, faToggleOff, faEnvelope, faClipboardList, faPrint, faPlus, faChartBar } from '@fortawesome/free-solid-svg-icons';
 import { AuthService, UserRecord } from '../services/auth.service';
 
 interface SettingEntry {
@@ -21,8 +21,8 @@ interface SettingEntry {
       <div class="admin-panel">
         <div class="admin-header d-flex justify-content-between align-items-center mb-3">
           <h4 class="mb-0">
-            <button class="btn btn-sm btn-outline-secondary me-2" (click)="close.emit()">
-              <fa-icon [icon]="faArrowLeft" />
+            <button class="btn btn-sm btn-outline-secondary me-2" (click)="close.emit()" title="Back">
+              &larr;
             </button>
             Admin Panel — User Management
           </h4>
@@ -91,7 +91,6 @@ interface SettingEntry {
                 <th>Group</th>
                 <th>Home Directory</th>
                 <th>Email</th>
-                <th class="text-center">Cookies</th>
                 <th class="text-center">2FA</th>
                 <th class="text-center">Must Change PW</th>
                 <th>Actions</th>
@@ -112,10 +111,6 @@ interface SettingEntry {
                 <td>
                   <input type="text" class="form-control form-control-sm" placeholder="Filter…"
                     [(ngModel)]="filterEmail" (ngModelChange)="applyUserFilters()">
-                </td>
-                <td>
-                  <input type="text" class="form-control form-control-sm" placeholder="Filter…"
-                    [(ngModel)]="filterCookies" (ngModelChange)="applyUserFilters()">
                 </td>
                 <td>
                   <input type="text" class="form-control form-control-sm" placeholder="Filter…"
@@ -159,13 +154,6 @@ interface SettingEntry {
                     }
                   </td>
                   <td class="text-center" [class.text-decoration-line-through]="!user.enabled">
-                    @if (user.has_cookies) {
-                      <span class="badge bg-success">Yes</span>
-                    } @else {
-                      <span class="badge bg-secondary">No</span>
-                    }
-                  </td>
-                  <td class="text-center" [class.text-decoration-line-through]="!user.enabled">
                     @if (user.totp_enabled) {
                       <span class="badge bg-success">On</span>
                     } @else {
@@ -182,7 +170,7 @@ interface SettingEntry {
                   <td>
                     <div class="btn-group btn-group-sm">
                       <button class="btn btn-outline-info" title="User Settings" (click)="openSettings(user)">
-                        <fa-icon [icon]="faCog" />
+                        <fa-icon [icon]="faGear" />
                       </button>
                       <button class="btn btn-outline-warning" title="Reset Password" (click)="openResetPassword(user)">
                         <fa-icon [icon]="faKey" />
@@ -192,7 +180,7 @@ interface SettingEntry {
                         [title]="user.totp_enabled ? 'Disable 2FA' : '2FA not enabled'"
                         [disabled]="!user.totp_enabled"
                         (click)="adminDisable2fa(user)">
-                        <fa-icon [icon]="faShieldAlt" />
+                        <fa-icon [icon]="faShieldHalved" />
                       </button>
                       <button
                         [class]="user.enabled ? 'btn btn-outline-success' : 'btn btn-outline-danger'"
@@ -204,7 +192,7 @@ interface SettingEntry {
                       <button class="btn btn-outline-danger" title="Delete User"
                         [disabled]="user.username === 'admin'"
                         (click)="deleteUser(user)">
-                        <fa-icon [icon]="faTrashAlt" />
+                        <fa-icon [icon]="faTrashCan" />
                       </button>
                     </div>
                   </td>
@@ -290,7 +278,7 @@ interface SettingEntry {
                             }
                             @if (settingsTarget.email) {
                               <button class="btn btn-outline-danger btn-sm" (click)="adminDeleteEmail()" title="Remove email">
-                                <fa-icon [icon]="faTrashAlt" />
+                                <fa-icon [icon]="faTrashCan" />
                               </button>
                             }
                           </div>
@@ -342,7 +330,7 @@ interface SettingEntry {
                                 @if (!entry.isOverride) {
                                   <span class="badge bg-secondary ms-1" style="font-size:0.65em">global</span>
                                 } @else {
-                                  <span class="badge bg-info ms-1" style="font-size:0.65em">user</span>
+                                  <span class="badge bg-info text-dark ms-1" style="font-size:0.65em">user</span>
                                 }
                               </td>
                               <td>
@@ -363,11 +351,11 @@ interface SettingEntry {
                   <button class="btn btn-sm btn-secondary" (click)="settingsTarget = null">Close</button>
                   @if (needsRenameOrHomedir) {
                     <button class="btn btn-sm btn-warning" [disabled]="!settingsDirty || settingsLoading" (click)="saveSettings(true)">
-                      <fa-icon [icon]="faSave" class="me-1" /> Save &amp; Move
+                      <fa-icon [icon]="faFloppyDisk" class="me-1" /> Save &amp; Move
                     </button>
                   }
                   <button class="btn btn-sm btn-primary" [disabled]="!settingsDirty || settingsLoading" (click)="saveSettings(false)">
-                    <fa-icon [icon]="faSave" class="me-1" /> Save
+                    <fa-icon [icon]="faFloppyDisk" class="me-1" /> Save
                   </button>
                 </div>
               </div>
@@ -429,7 +417,7 @@ interface SettingEntry {
                             <td class="small text-muted">{{ p.uri }}</td>
                             <td>
                               <button class="btn btn-sm btn-outline-danger" (click)="deletePrinter(p.name)" [disabled]="printersBusy">
-                                <fa-icon [icon]="faTrashAlt" />
+                                <fa-icon [icon]="faTrashCan" />
                               </button>
                             </td>
                           </tr>
@@ -597,6 +585,138 @@ interface SettingEntry {
             </div>
           </div>
         }
+
+        <!-- SMTP Configuration Modal (admin-group only) -->
+        @if (showSmtpModal) {
+          <div class="modal fade show d-block" style="background:rgba(0,0,0,0.4);z-index:10000">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <div class="modal-header py-2">
+                  <h6 class="modal-title">SMTP Email Configuration</h6>
+                  <button class="btn-close btn-close-sm" (click)="showSmtpModal = false"></button>
+                </div>
+                <div class="modal-body">
+                  @if (smtpStatus) {
+                    <div class="alert py-1 small" [class.alert-success]="!smtpStatusErr" [class.alert-danger]="smtpStatusErr">
+                      {{ smtpStatus }}
+                    </div>
+                  }
+                  @if (smtpLoading) {
+                    <div class="text-center py-3">
+                      <span class="spinner-border spinner-border-sm"></span> Loading…
+                    </div>
+                  } @else {
+                    <!-- Username -->
+                    <div class="row g-2">
+                      <div class="col-12">
+                        <label class="form-label mb-0 small fw-semibold">Username</label>
+                        <input type="text" class="form-control form-control-sm" [(ngModel)]="smtpUsername"
+                          placeholder="user&#64;gmail.com" name="smtpUsername">
+                      </div>
+                    </div>
+                    <!-- Password -->
+                    <div class="row g-2 mt-1">
+                      <div class="col-12">
+                        <label class="form-label mb-0 small fw-semibold">Password</label>
+                        <input type="password" class="form-control form-control-sm" [(ngModel)]="smtpPassword"
+                          placeholder="App password (leave blank to keep existing)" name="smtpPassword">
+                        <small class="text-muted">
+                          Gmail / Yahoo / Outlook with 2FA: use an <strong>App Password</strong>, not your regular password.
+                        </small>
+                      </div>
+                    </div>
+                    <!-- SMTP Host + Port + Auto-detect -->
+                    <div class="row g-2 mt-1 align-items-end">
+                      <div class="col">
+                        <label class="form-label mb-0 small fw-semibold">SMTP Host</label>
+                        <input type="text" class="form-control form-control-sm" [(ngModel)]="smtpHost"
+                          placeholder="" name="smtpHost" [disabled]="smtpAutoDetect">
+                      </div>
+                      <div class="col-auto" style="width:80px">
+                        <label class="form-label mb-0 small fw-semibold">Port</label>
+                        <input type="number" class="form-control form-control-sm" [(ngModel)]="smtpPort"
+                          placeholder="587" name="smtpPort" [disabled]="smtpAutoDetect">
+                      </div>
+                      <div class="col-auto d-flex align-items-center gap-1 pb-1">
+                        <input type="checkbox" class="form-check-input" id="smtpAutoDetectAdmin"
+                          [(ngModel)]="smtpAutoDetect" (ngModelChange)="smtpDetectResult = 'none'">
+                        <label class="form-check-label small" for="smtpAutoDetectAdmin">Auto-detect</label>
+                        @if (smtpAutoDetect) {
+                          <button class="btn btn-sm ms-1"
+                            [class.btn-outline-secondary]="smtpDetectResult === 'none'"
+                            [class.btn-success]="smtpDetectResult === 'ok'"
+                            [class.btn-danger]="smtpDetectResult === 'fail'"
+                            [disabled]="smtpDetecting || !smtpUsername"
+                            (click)="detectSmtp()">
+                            @if (smtpDetecting) {
+                              <span class="spinner-border spinner-border-sm"></span>
+                            } @else if (smtpDetectResult === 'ok') {
+                              Detected &#x2714;
+                            } @else if (smtpDetectResult === 'fail') {
+                              Failed &#x2718;
+                            } @else {
+                              Detect
+                            }
+                          </button>
+                        }
+                      </div>
+                    </div>
+                    <!-- Security + Sender Name + From Address -->
+                    <div class="row g-2 mt-1">
+                      <div class="col-4">
+                        <label class="form-label mb-0 small fw-semibold">Security</label>
+                        <select class="form-select form-select-sm" [(ngModel)]="smtpSecurity" name="smtpSecurity"
+                          [disabled]="smtpAutoDetect">
+                          <option value="starttls">STARTTLS</option>
+                          <option value="ssl">SSL/TLS</option>
+                          <option value="none">None</option>
+                        </select>
+                      </div>
+                      <div class="col-4">
+                        <label class="form-label mb-0 small fw-semibold">Sender Name</label>
+                        <input type="text" class="form-control form-control-sm" [(ngModel)]="smtpSenderName"
+                          placeholder="Printers" name="smtpSenderName">
+                      </div>
+                      <div class="col-4">
+                        <label class="form-label mb-0 small fw-semibold">From Address</label>
+                        <input type="text" class="form-control form-control-sm" [(ngModel)]="smtpFromAddress"
+                          placeholder="noreply&#64;example.com" name="smtpFromAddress">
+                      </div>
+                    </div>
+                    <hr class="my-2">
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="small fw-semibold">Status:</span>
+                      @if (smtpConfigStatus === 'verified') {
+                        <span class="badge bg-success">Activated</span>
+                      } @else if (smtpConfigStatus === 'failed') {
+                        <span class="badge bg-danger">Failed</span>
+                      } @else {
+                        <span class="badge bg-warning text-dark">Not configured</span>
+                      }
+                    </div>
+                  }
+                </div>
+                <div class="modal-footer py-1">
+                  <button class="btn btn-sm btn-secondary" (click)="showSmtpModal = false">Close</button>
+                  <button class="btn btn-sm btn-primary" (click)="saveSmtp()" [disabled]="smtpLoading || smtpSaving">
+                    Save
+                  </button>
+                  <button class="btn btn-sm" (click)="testSmtp()" [disabled]="smtpLoading || smtpSaving"
+                    [class.btn-warning]="smtpConfigStatus !== 'verified'"
+                    [class.btn-success]="smtpConfigStatus === 'verified'">
+                    @if (smtpSaving) {
+                      <span class="spinner-border spinner-border-sm"></span>
+                    } @else if (smtpConfigStatus === 'verified') {
+                      Activated &#x2714;
+                    } @else {
+                      Activate
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
       </div>
     </div>
   `,
@@ -628,18 +748,15 @@ export class AdminPanelComponent implements OnInit {
   auth = inject(AuthService);
   private http = inject(HttpClient);
   readonly close = output<void>();
-  readonly smtpOpen = output<void>();
 
-  faTrashAlt = faTrashAlt;
+  faTrashCan = faTrashCan;
   faKey = faKey;
   faUserPlus = faUserPlus;
   faLock = faLock;
   faUnlock = faUnlock;
-  faTimes = faTimes;
-  faArrowLeft = faArrowLeft;
-  faCog = faCog;
-  faSave = faSave;
-  faShieldAlt = faShieldAlt;
+  faGear = faGear;
+  faFloppyDisk = faFloppyDisk;
+  faShieldHalved = faShieldHalved;
   faToggleOn = faToggleOn;
   faToggleOff = faToggleOff;
   faEnvelope = faEnvelope;
@@ -654,7 +771,6 @@ export class AdminPanelComponent implements OnInit {
   filterGroup = '';
   filterHomedir = '';
   filterEmail = '';
-  filterCookies = '';
   filter2fa = '';
   filterChangePw = '';
   statusMsg = '';
@@ -674,6 +790,24 @@ export class AdminPanelComponent implements OnInit {
   globalLogFilterName = '';
   showClearGlobalLogConfirm = false;
   clearingGlobalLog = false;
+
+  // SMTP state
+  showSmtpModal = false;
+  smtpLoading = false;
+  smtpSaving = false;
+  smtpStatus = '';
+  smtpStatusErr = false;
+  smtpHost = '';
+  smtpPort = 587;
+  smtpUsername = '';
+  smtpPassword = '';
+  smtpSecurity = 'starttls';
+  smtpSenderName = 'Printers';
+  smtpFromAddress = '';
+  smtpConfigStatus = '';
+  smtpAutoDetect = false;
+  smtpDetecting = false;
+  smtpDetectResult: 'none' | 'ok' | 'fail' = 'none';
 
   // CUPS printers state
   showPrinters = false;
@@ -742,9 +876,6 @@ export class AdminPanelComponent implements OnInit {
     if (this.filterEmail) {
       result = this._regexFilter(result, this.filterEmail, u => u.email || '');
     }
-    if (this.filterCookies) {
-      result = this._regexFilter(result, this.filterCookies, u => u.has_cookies ? 'Yes' : 'No');
-    }
     if (this.filter2fa) {
       result = this._regexFilter(result, this.filter2fa, u => u.totp_enabled ? 'On' : 'Off');
     }
@@ -771,7 +902,7 @@ export class AdminPanelComponent implements OnInit {
           this.showStatus(`User "${this.newUsername}" created.`);
           this.newUsername = '';
           this.newPassword = '';
-          this.newGroup = 'guest-group';
+          this.newGroup = 'users-group';
           this.loadUsers();
         } else {
           this.showStatus(res.msg, true);
@@ -1091,7 +1222,142 @@ export class AdminPanelComponent implements OnInit {
   }
 
   openSmtp() {
-    this.smtpOpen.emit();
+    this.smtpStatus = '';
+    this.smtpStatusErr = false;
+    this.smtpLoading = true;
+    this.smtpPassword = '';
+    this.smtpAutoDetect = false;
+    this.smtpDetecting = false;
+    this.smtpDetectResult = 'none';
+    this.showSmtpModal = true;
+    this.auth.getSmtpConfig().subscribe({
+      next: (res) => {
+        this.smtpLoading = false;
+        const cfg = res.smtp;
+        this.smtpHost = cfg.host || '';
+        this.smtpPort = cfg.port || 587;
+        this.smtpUsername = cfg.username || '';
+        this.smtpSecurity = cfg.security || 'starttls';
+        this.smtpSenderName = cfg.sender_name || 'Printers';
+        this.smtpFromAddress = cfg.from_address || '';
+        this.smtpConfigStatus = cfg.status || '';
+      },
+      error: () => {
+        this.smtpLoading = false;
+        this.smtpStatus = 'Failed to load SMTP config.';
+        this.smtpStatusErr = true;
+      },
+    });
+  }
+
+  saveSmtp() {
+    this.smtpSaving = true;
+    const cfg: Record<string, unknown> = {
+      host: this.smtpHost,
+      port: this.smtpPort,
+      username: this.smtpUsername,
+      security: this.smtpSecurity,
+      sender_name: this.smtpSenderName,
+      from_address: this.smtpFromAddress,
+    };
+    if (this.smtpPassword) {
+      cfg['password'] = this.smtpPassword;
+    }
+    this.auth.saveSmtpConfig(cfg).subscribe({
+      next: (res) => {
+        this.smtpSaving = false;
+        if (res.status === 'ok') {
+          this.smtpStatus = res.msg;
+          this.smtpStatusErr = false;
+          setTimeout(() => { this.smtpStatus = ''; }, 3000);
+        } else {
+          this.smtpStatus = res.msg;
+          this.smtpStatusErr = true;
+        }
+      },
+      error: (err: { error?: { msg?: string } }) => {
+        this.smtpSaving = false;
+        this.smtpStatus = err?.error?.msg || 'Error saving SMTP config.';
+        this.smtpStatusErr = true;
+      },
+    });
+  }
+
+  testSmtp() {
+    this.smtpSaving = true;
+    this.smtpStatus = '';
+    const cfg: Record<string, unknown> = {
+      host: this.smtpHost,
+      port: this.smtpPort,
+      username: this.smtpUsername,
+      security: this.smtpSecurity,
+      sender_name: this.smtpSenderName,
+      from_address: this.smtpFromAddress,
+    };
+    if (this.smtpPassword) {
+      cfg['password'] = this.smtpPassword;
+    }
+    this.auth.saveSmtpConfig(cfg).subscribe({
+      next: () => {
+        this.auth.testSmtpConfig().subscribe({
+          next: (res) => {
+            this.smtpSaving = false;
+            this.smtpConfigStatus = res.smtp_status || '';
+            if (res.status === 'ok') {
+              this.smtpStatus = res.msg;
+              this.smtpStatusErr = false;
+            } else {
+              this.smtpStatus = res.msg;
+              this.smtpStatusErr = true;
+            }
+          },
+          error: (err: { error?: { msg?: string } }) => {
+            this.smtpSaving = false;
+            this.smtpConfigStatus = 'failed';
+            this.smtpStatus = err?.error?.msg || 'SMTP test failed.';
+            this.smtpStatusErr = true;
+          },
+        });
+      },
+      error: (err: { error?: { msg?: string } }) => {
+        this.smtpSaving = false;
+        this.smtpStatus = err?.error?.msg || 'Failed to save before testing.';
+        this.smtpStatusErr = true;
+      },
+    });
+  }
+
+  detectSmtp() {
+    const email = this.smtpUsername.trim();
+    if (!email || !email.includes('@')) {
+      this.smtpStatus = 'Enter a valid email in the Username field first.';
+      this.smtpStatusErr = true;
+      return;
+    }
+    this.smtpDetecting = true;
+    this.smtpDetectResult = 'none';
+    this.smtpStatus = '';
+    this.auth.detectSmtp(email).subscribe({
+      next: (res) => {
+        this.smtpDetecting = false;
+        if (res.detected) {
+          this.smtpHost = res.host!;
+          this.smtpPort = res.port!;
+          this.smtpSecurity = res.security!;
+          this.smtpDetectResult = 'ok';
+        } else {
+          this.smtpDetectResult = 'fail';
+          this.smtpStatus = res.msg || 'Could not auto-detect SMTP settings.';
+          this.smtpStatusErr = true;
+        }
+      },
+      error: (err: { error?: { msg?: string } }) => {
+        this.smtpDetecting = false;
+        this.smtpDetectResult = 'fail';
+        this.smtpStatus = err?.error?.msg || 'Auto-detect failed.';
+        this.smtpStatusErr = true;
+      },
+    });
   }
 
   openPrinters() {

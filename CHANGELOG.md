@@ -4,7 +4,34 @@ All notable changes to the printers container are documented here.
 
 ## [Unreleased]
 
-## [0.1.6] - 2026-05-15
+## [0.1.9] - 2026-05-22
+
+### Fixed
+- **Add User bug**: after a successful user creation the group select was
+  silently reset to `'guest-group'` (an invalid group), causing every
+  subsequent creation attempt to fail with "Invalid group." from the backend.
+  Fixed by resetting to `'users-group'` instead.
+- **Back-arrow icon**: the `faArrowLeft` icon from `@fortawesome/free-solid-svg-icons`
+  did not render via `@fortawesome/angular-fontawesome ~4.0.0` (FA6-era
+  wrapper + FA7 icon). Replaced with a plain `&larr;` HTML entity so the
+  button is always visible and correctly labelled.
+- **FA7 icon renames**: updated all icon references that were renamed between
+  FA5 and FA6/7 — `faTrashAlt→faTrashCan`, `faCog→faGear`,
+  `faShieldAlt→faShieldHalved`, `faSave→faFloppyDisk` — preventing empty
+  icon buttons throughout the admin panel.
+
+### Changed
+- **Removed "Cookies" column** from the User Management table (header, filter
+  row, data cell, state variable, and filter logic all removed).  The column
+  was not used by the printers app and just added visual clutter.
+- **SMTP email configuration** now opens as an inline modal inside the admin
+  panel (previously it emitted an unhandled `smtpOpen` output event).  The
+  modal is identical in form and function to the videodl equivalent and uses
+  the existing `api/admin/smtp`, `api/admin/smtp/test`, and
+  `api/admin/smtp/detect` backend endpoints.  Supports auto-detect, manual
+  host/port/security, sender name, and from-address fields.
+
+
 
 ### Changed
 - Landing page: shows only the **monthly** page/job count by default; the full
