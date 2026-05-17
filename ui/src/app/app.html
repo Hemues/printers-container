@@ -12,9 +12,9 @@
 @if (!auth.isLoggedIn()) {
   <app-login (loggedIn)="onLoggedIn()" />
 } @else {
-  <nav class="navbar navbar-expand-md sticky-top border-bottom">
+  <nav class="navbar navbar-expand-md navbar-dark sticky-top border-bottom" data-bs-theme="dark">
     <div class="container-fluid">
-      <span class="navbar-brand brand-contrast">
+      <span class="navbar-brand">
         <fa-icon [icon]="faPrint" class="me-1" /> Printers
       </span>
       <div class="navbar-nav ms-auto d-flex flex-row align-items-center gap-2">
