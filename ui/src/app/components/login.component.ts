@@ -1,18 +1,20 @@
 import { Component, inject, OnInit, output } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { faPrint } from '@fortawesome/free-solid-svg-icons';
 import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, FontAwesomeModule],
   template: `
     <div class="login-overlay">
       <div class="login-card">
         <div class="text-center mb-4">
           <img src="assets/icons/android-chrome-192x192.png" alt="Printers" height="64">
-          <h3 class="mt-2">Printers</h3>
+          <h3 class="mt-2"><fa-icon [icon]="faPrint" class="me-1" /> Printers</h3>
           @if (!show2fa) {
             <p class="text-muted">Sign in to continue</p>
           } @else {
@@ -194,6 +196,7 @@ export class LoginComponent implements OnInit {
   private http = inject(HttpClient);
   readonly loggedIn = output<void>();
 
+  faPrint = faPrint;
   version: string | null = null;
 
   username = '';
