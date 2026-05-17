@@ -2,7 +2,7 @@ import { Component, inject, OnInit, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faTrashCan, faKey, faUserPlus, faLock, faUnlock, faGear, faFloppyDisk, faShieldHalved, faToggleOn, faToggleOff, faEnvelope, faClipboardList, faPrint, faPlus, faChartBar, faArrowLeft, faCircleCheck, faCircleXmark, faPenToSquare, faSearch, faNetworkWired, faUsb, faServer, faGlobe } from '@fortawesome/free-solid-svg-icons';
+import { faTrashCan, faKey, faUserPlus, faLock, faUnlock, faGear, faFloppyDisk, faShieldHalved, faToggleOn, faToggleOff, faEnvelope, faClipboardList, faPrint, faPlus, faChartBar, faArrowLeft, faCircleCheck, faCircleXmark, faPenToSquare, faSearch, faNetworkWired, faPlug, faServer, faGlobe } from '@fortawesome/free-solid-svg-icons';
 import { AuthService, UserRecord } from '../services/auth.service';
 
 interface SettingEntry {
@@ -489,7 +489,7 @@ interface SettingEntry {
                         <div class="small text-muted">Shadow PDF queue — every job is captured as a PDF in the user's print history. Default for new servers.</div>
                       </button>
                       <button class="list-group-item list-group-item-action" [class.active]="wizardConnType === 'usb'" (click)="wizardConnType = 'usb'; loadWizardDevices()">
-                        <fa-icon [icon]="faUsb" class="me-2" /> <strong>USB</strong>
+                        <fa-icon [icon]="faPlug" class="me-2" /> <strong>USB</strong>
                         <div class="small text-muted">Printer plugged directly into the host. Choose the device URI on the next step.</div>
                       </button>
                       <button class="list-group-item list-group-item-action" [class.active]="wizardConnType === 'socket'" (click)="wizardConnType = 'socket'">
@@ -983,7 +983,7 @@ export class AdminPanelComponent implements OnInit {
   faPenToSquare = faPenToSquare;
   faSearch = faSearch;
   faNetworkWired = faNetworkWired;
-  faUsb = faUsb;
+  faPlug = faPlug;
   faServer = faServer;
   faGlobe = faGlobe;
 
