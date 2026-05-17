@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { SwUpdate } from '@angular/service-worker';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import {
@@ -66,15 +67,28 @@ export class App implements OnInit {
 
   printersVersion: string | null = null;
 
+  private swUpdate = inject(SwUpdate);
+
   ngOnInit() {
     this.applyStoredTheme();
     this.fetchVersion();
+    this.checkForUpdates();
     if (this.auth.token()) {
       this.auth.checkSession().subscribe({
         next: () => this.afterSession(),
         error: () => { /* invalid token cleared inside service */ },
       });
     }
+  }
+
+  private checkForUpdates() {
+    if (!this.swUpdate.isEnabled) return;
+    this.swUpdate.versionUpdates.subscribe((event) => {
+      if (event.type === 'VERSION_READY') {
+        document.location.reload();
+      }
+    });
+    this.swUpdate.checkForUpdate().catch(() => {});
   }
 
   private applyStoredTheme() {

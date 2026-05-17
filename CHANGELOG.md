@@ -4,6 +4,17 @@ All notable changes to the printers container are documented here.
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-05-17
+
+### Fixed
+- **Root cause of missing FA icons**: service worker was caching old app
+  versions indefinitely. Replaced videodl's share-target service worker with
+  a printers-specific one that uses `skipWaiting()` + `clients.claim()` to
+  force immediate activation of new versions.
+- Added `SwUpdate` version detection in app component — automatically reloads
+  the page when a new version is available, eliminating stale-cache issues.
+- Added FA printer icon to login page header for visual consistency.
+
 ## [0.1.14] - 2026-05-17
 
 ### Fixed
