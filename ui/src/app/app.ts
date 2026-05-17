@@ -132,8 +132,8 @@ export class App implements OnInit {
   }
 
   fetchStats() {
-    this.http.get<PrintStats>('api/stats').subscribe({
-      next: (r) => this.stats.set(r),
+    this.http.get<{ status: string; stats: PrintStats }>('api/stats').subscribe({
+      next: (r) => this.stats.set(r.stats),
       error: () => this.stats.set(null),
     });
   }

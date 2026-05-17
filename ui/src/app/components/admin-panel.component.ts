@@ -27,7 +27,7 @@ interface SettingEntry {
             Admin Panel — User Management
           </h4>
           <div class="d-flex align-items-center gap-2">
-            @if (auth.isAdminGroup()) {
+            @if (auth.group() === 'admin-group') {
               <button class="btn btn-sm btn-outline-info" (click)="openSmtp()" title="SMTP Email Configuration">
                 <fa-icon [icon]="faEnvelope" />
               </button>
@@ -70,7 +70,7 @@ interface SettingEntry {
                 <select class="form-select form-select-sm" [(ngModel)]="newGroup" name="newGroup">
                   <option value="users-group">Users</option>
                   <option value="useradmin-group">UserAdmins</option>
-                  @if (auth.isAdminGroup()) {
+                  @if (auth.group() === 'admin-group') {
                     <option value="admin-group">Administrators</option>
                   }
                 </select>
@@ -138,7 +138,7 @@ interface SettingEntry {
                       style="width:140px">
                       <option value="users-group">Users</option>
                       <option value="useradmin-group">UserAdmins</option>
-                      @if (auth.isAdminGroup()) {
+                      @if (auth.group() === 'admin-group') {
                         <option value="admin-group">Administrators</option>
                       }
                     </select>
@@ -303,7 +303,7 @@ interface SettingEntry {
                             [disabled]="settingsTarget.username === 'admin' || !canManage(settingsTarget)">
                             <option value="users-group">Users</option>
                             <option value="useradmin-group">UserAdmins</option>
-                            @if (auth.isAdminGroup()) {
+                            @if (auth.group() === 'admin-group') {
                               <option value="admin-group">Administrators</option>
                             }
                           </select>
