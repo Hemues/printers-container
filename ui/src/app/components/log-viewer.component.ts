@@ -1,7 +1,7 @@
 ﻿import { Component, inject, OnInit, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faXmark, faSearch, faDownload } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faSearch, faDownload, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { AuthService } from '../services/auth.service';
 import { DownloadsService } from '../services/downloads.service';
 
@@ -34,7 +34,9 @@ interface LogEntry {
               [disabled]="selectedCount === 0">
               <fa-icon [icon]="faDownload" class="me-1" /> Export Selected
             </button>
-            <button class="btn-close" (click)="close.emit()" aria-label="Close"></button>
+            <button class="btn btn-sm btn-outline-secondary" (click)="close.emit()" title="Close">
+              <fa-icon [icon]="faTimes" />
+            </button>
           </div>
         </div>
 
@@ -205,6 +207,7 @@ export class LogViewerComponent implements OnInit {
   faXmark = faXmark;
   faSearch = faSearch;
   faDownload = faDownload;
+  faTimes = faTimes;
 
   entries: LogEntry[] = [];
   filteredEntries: LogEntry[] = [];

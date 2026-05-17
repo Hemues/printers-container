@@ -1,11 +1,13 @@
 import { Component, inject, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { faTimes } from '@fortawesome/free-solid-svg-icons';
 import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-change-password',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, FontAwesomeModule],
   template: `
     <div class="modal fade show d-block" style="background:rgba(0,0,0,0.4); z-index: 9999">
       <div class="modal-dialog modal-sm">
@@ -13,7 +15,9 @@ import { AuthService } from '../services/auth.service';
           <div class="modal-header py-2">
             <h6 class="modal-title">Change Password</h6>
             @if (!forceChange()) {
-              <button class="btn-close btn-close-sm" (click)="closed.emit()"></button>
+              <button class="btn btn-sm btn-outline-secondary" (click)="closed.emit()" title="Close">
+                <fa-icon [icon]="faTimes" />
+              </button>
             }
           </div>
           <div class="modal-body">
@@ -69,6 +73,7 @@ export class ChangePasswordComponent {
   readonly forceChange = input(false);
   readonly closed = output<void>();
   readonly passwordChanged = output<void>();
+  faTimes = faTimes;
 
   currentPw = '';
   newPw = '';

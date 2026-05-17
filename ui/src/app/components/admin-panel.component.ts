@@ -2,7 +2,7 @@ import { Component, inject, OnInit, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faTrashCan, faKey, faUserPlus, faLock, faUnlock, faGear, faFloppyDisk, faShieldHalved, faToggleOn, faToggleOff, faEnvelope, faClipboardList, faPrint, faPlus, faChartBar, faArrowLeft, faCircleCheck, faCircleXmark, faPenToSquare, faSearch, faNetworkWired, faPlug, faServer, faGlobe } from '@fortawesome/free-solid-svg-icons';
+import { faTrashCan, faKey, faUserPlus, faLock, faUnlock, faGear, faFloppyDisk, faShieldHalved, faToggleOn, faToggleOff, faEnvelope, faClipboardList, faPrint, faPlus, faChartBar, faArrowLeft, faCircleCheck, faCircleXmark, faPenToSquare, faSearch, faNetworkWired, faPlug, faServer, faGlobe, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { AuthService, UserRecord } from '../services/auth.service';
 
 interface SettingEntry {
@@ -41,7 +41,9 @@ interface SettingEntry {
                 <fa-icon [icon]="faClipboardList" />
               </button>
             }
-            <button class="btn-close" (click)="close.emit()" aria-label="Close"></button>
+            <button class="btn btn-sm btn-outline-secondary" (click)="close.emit()" title="Close">
+              <fa-icon [icon]="faTimes" />
+            </button>
           </div>
         </div>
 
@@ -209,7 +211,9 @@ interface SettingEntry {
               <div class="modal-content">
                 <div class="modal-header py-2">
                   <h6 class="modal-title">Reset Password — {{ resetTarget.username }}</h6>
-                  <button class="btn-close btn-close-sm" (click)="resetTarget = null"></button>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="resetTarget = null" title="Close">
+                    <fa-icon [icon]="faTimes" />
+                  </button>
                 </div>
                 <div class="modal-body">
                   <input type="text" class="form-control form-control-sm" [(ngModel)]="resetNewPassword"
@@ -231,7 +235,9 @@ interface SettingEntry {
               <div class="modal-content">
                 <div class="modal-header py-2">
                   <h6 class="modal-title">Settings — {{ settingsTarget.username }}</h6>
-                  <button class="btn-close btn-close-sm" (click)="settingsTarget = null"></button>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="settingsTarget = null" title="Close">
+                    <fa-icon [icon]="faTimes" />
+                  </button>
                 </div>
                 <div class="modal-body p-0">
                   @if (settingsLoading) {
@@ -373,7 +379,9 @@ interface SettingEntry {
                     <fa-icon [icon]="faPrint" class="me-2" />
                     Printer Server Settings
                   </h6>
-                  <button class="btn-close" (click)="showPrinters = false"></button>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="showPrinters = false" title="Close">
+                    <fa-icon [icon]="faTimes" />
+                  </button>
                 </div>
                 <div class="modal-body">
                   @if (printersStatusMsg) {
@@ -478,7 +486,9 @@ interface SettingEntry {
                   <h6 class="modal-title">
                     <fa-icon [icon]="faPlus" class="me-2" /> Add Printer — Step {{ wizardStep === 'connection' ? '1' : wizardStep === 'device' ? '2' : '3' }} of 3
                   </h6>
-                  <button class="btn-close" (click)="showAddPrinterWizard = false"></button>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="showAddPrinterWizard = false" title="Close">
+                    <fa-icon [icon]="faTimes" />
+                  </button>
                 </div>
                 <div class="modal-body">
                   @if (wizardStep === 'connection') {
@@ -620,7 +630,9 @@ interface SettingEntry {
                   <h6 class="modal-title">
                     <fa-icon [icon]="faPenToSquare" class="me-2" /> Modify "{{ modifyName }}"
                   </h6>
-                  <button class="btn-close" (click)="showModifyPrinter = false"></button>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="showModifyPrinter = false" title="Close">
+                    <fa-icon [icon]="faTimes" />
+                  </button>
                 </div>
                 <div class="modal-body">
                   <div class="mb-2">
@@ -654,7 +666,9 @@ interface SettingEntry {
               <div class="modal-content">
                 <div class="modal-header py-2">
                   <h6 class="modal-title">Global Print Statistics</h6>
-                  <button class="btn-close btn-close-sm" (click)="showAdminStatsModal = false"></button>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="showAdminStatsModal = false" title="Close">
+                    <fa-icon [icon]="faTimes" />
+                  </button>
                 </div>
                 <div class="modal-body">
                   @if (adminStatsLoading) {
@@ -690,7 +704,9 @@ interface SettingEntry {
               <div class="modal-content">
                 <div class="modal-header py-2">
                   <h6 class="modal-title">Global Print Log</h6>
-                  <button class="btn-close btn-close-sm" (click)="showGlobalLog = false"></button>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="showGlobalLog = false" title="Close">
+                    <fa-icon [icon]="faTimes" />
+                  </button>
                 </div>
                 <div class="modal-body p-0">
                   @if (globalLogLoading) {
@@ -760,7 +776,7 @@ interface SettingEntry {
                 <div class="modal-footer py-1 d-flex justify-content-between">
                   <button class="btn btn-sm btn-danger" (click)="showClearGlobalLogConfirm = true"
                     [disabled]="globalLogLoading || clearingGlobalLog || globalLogEntries.length === 0">
-                    <i class="fa-solid fa-trash-can me-1"></i>Clear Global Log
+                    <fa-icon [icon]="faTrashCan" class="me-1" />Clear Global Log
                   </button>
                   <button class="btn btn-sm btn-secondary" (click)="showGlobalLog = false">Close</button>
                 </div>
@@ -771,7 +787,9 @@ interface SettingEntry {
                     <div class="card shadow" style="min-width: 340px; max-width: 440px;">
                       <div class="card-header py-2 d-flex justify-content-between align-items-center">
                         <span class="fw-semibold">Confirm Clear Global Log</span>
-                        <button class="btn-close btn-close-sm" (click)="showClearGlobalLogConfirm = false"></button>
+                        <button class="btn btn-sm btn-outline-secondary" (click)="showClearGlobalLogConfirm = false" title="Close">
+                          <fa-icon [icon]="faTimes" />
+                        </button>
                       </div>
                       <div class="card-body text-center">
                         @if (clearingGlobalLog) {
@@ -780,10 +798,10 @@ interface SettingEntry {
                           <p class="mb-3">How would you like to clear the global log?</p>
                           <div class="d-flex flex-column gap-2">
                             <button class="btn btn-warning" (click)="doClearGlobalLog(true)">
-                              <i class="fa-solid fa-box-archive me-1"></i>Archive &amp; Clear
+                              <fa-icon [icon]="faFloppyDisk" class="me-1" />Archive &amp; Clear
                             </button>
                             <button class="btn btn-danger" (click)="doClearGlobalLog(false)">
-                              <i class="fa-solid fa-trash-can me-1"></i>Clear
+                              <fa-icon [icon]="faTrashCan" class="me-1" />Clear
                             </button>
                             <button class="btn btn-secondary" (click)="showClearGlobalLogConfirm = false">
                               Cancel
@@ -806,7 +824,9 @@ interface SettingEntry {
               <div class="modal-content">
                 <div class="modal-header py-2">
                   <h6 class="modal-title">SMTP Email Configuration</h6>
-                  <button class="btn-close btn-close-sm" (click)="showSmtpModal = false"></button>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="showSmtpModal = false" title="Close">
+                    <fa-icon [icon]="faTimes" />
+                  </button>
                 </div>
                 <div class="modal-body">
                   @if (smtpStatus) {
@@ -986,6 +1006,7 @@ export class AdminPanelComponent implements OnInit {
   faPlug = faPlug;
   faServer = faServer;
   faGlobe = faGlobe;
+  faTimes = faTimes;
 
   users: UserRecord[] = [];
   filteredUsers: UserRecord[] = [];

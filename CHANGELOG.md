@@ -4,6 +4,18 @@ All notable changes to the printers container are documented here.
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-05-17
+
+### Fixed
+- All close buttons replaced with visible FA icon buttons (matching videodl
+  approach) — resolves invisible `btn-close` in dark mode across admin panel,
+  change-password, two-factor-setup, log-viewer, and all sub-modals.
+- Fixed broken `<i class="fa-solid ...">` tags (CSS font approach) in global
+  log clear/archive buttons — replaced with proper `<fa-icon>` components
+  that use the SVG rendering pipeline.
+- Added global CSS safety rules ensuring `fa-icon` SVG elements always render
+  with correct dimensions and `fill: currentColor`.
+
 ## [0.1.13] - 2026-05-17
 
 ### Fixed

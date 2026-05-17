@@ -18,7 +18,9 @@ import { AuthService } from '../services/auth.service';
               @if (mode() === 'enable') { Enable Two-Factor Authentication }
               @else { Disable Two-Factor Authentication }
             </h5>
-            <button class="btn-close" (click)="closed.emit()"></button>
+            <button class="btn btn-sm btn-outline-secondary" (click)="closed.emit()" title="Close">
+              <fa-icon [icon]="faTimes" />
+            </button>
           </div>
           <div class="modal-body">
             @if (mode() === 'enable') {
