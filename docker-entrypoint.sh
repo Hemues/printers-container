@@ -24,7 +24,8 @@ mkdir -p "$CONFIG_DIR/cups" "$CONFIG_DIR/cups/ppd" \
          "$CONFIG_DIR/database/global" \
          "$LOG_DIR/samba" "$LOG_DIR/cups"
 mkdir -p /var/spool/cups-pdf/INBOX /var/spool/cups-pdf/SPOOL /var/spool/cups-pdf/ANONYMOUS
-mkdir -p /var/spool/samba /var/lib/samba/printers /run/cups /run/samba
+mkdir -p /var/spool/samba /var/lib/samba/printers /run/cups /run/samba /run/samba/msg.lock
+chmod 0755 /run/samba /run/samba/msg.lock
 
 # ---------------------------------------------------------------------------
 # Seed configs from templates the first time (or when the template is newer).
