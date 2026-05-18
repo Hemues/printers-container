@@ -17,6 +17,7 @@
 
 [global]
    workgroup = WORKGROUP
+   netbios name = PRINTERS
    server string = Printers (%v)
    server role = standalone server
    security = user
@@ -32,12 +33,12 @@
    printcap name = cups
    cups server = localhost:631
    disable spoolss = no
+   host msdfs = no
    log file = /logs/samba/log.%m
    max log size = 1000
    log level = 1
    dns proxy = no
    socket options = TCP_NODELAY
-   client min protocol = SMB2
    server min protocol = SMB2
 
 [print$]
