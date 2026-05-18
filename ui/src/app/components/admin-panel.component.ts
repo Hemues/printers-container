@@ -459,6 +459,9 @@ interface SettingEntry {
                               <button class="btn btn-sm btn-outline-primary me-1" (click)="openModifyPrinter(p)" [disabled]="printersBusy" title="Modify">
                                 <fa-icon [icon]="faPenToSquare" />
                               </button>
+                              <button class="btn btn-sm btn-outline-info me-1" (click)="printTestPage(p.name)" [disabled]="printersBusy" title="Print Test Page">
+                                <fa-icon [icon]="faPrint" />
+                              </button>
                               <button class="btn btn-sm btn-outline-danger" (click)="deletePrinter(p.name)" [disabled]="printersBusy" title="Remove">
                                 <fa-icon [icon]="faTrashCan" />
                               </button>
@@ -1804,6 +1807,18 @@ export class AdminPanelComponent implements OnInit {
         }
       },
       error: (err: any) => { this.printersBusy = false; this.showPrintersStatus(err?.error?.msg || 'Error.', true); },
+    });
+  }
+
+  printTestPage(name: string) {
+    this.printersBusy = true;
+    this.http.post<{ status: string; msg: string }>(`api/admin/printers/${encodeURIComponent(name)}/test-page`, {}).subscribe({
+      next: (res) => {
+        this.printersBusy = false;
+        if (res.status === 'ok') { this.showPrintersStatus(res.msg || 'Test page sent.'); }
+        else { this.showPrintersStatus(res.msg, true); }
+      },
+      error: (err: any) => { this.printersBusy = false; this.showPrintersStatus(err?.error?.msg || 'Error sending test page.', true); },
     });
   }
 

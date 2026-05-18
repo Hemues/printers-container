@@ -998,6 +998,16 @@ async def api_admin_disable_printer(request):
     return web.json_response({'status': 'ok', 'msg': f'Printer "{name}" disabled.'})
 
 
+@routes.post(config.URL_PREFIX + 'api/admin/printers/{name}/test-page')
+async def api_admin_print_test_page(request):
+    _require_admin(request)
+    name = request.match_info['name']
+    rc, out, err = _run(['lp', '-d', name, '/usr/share/cups/data/testprint.ps'])
+    if rc != 0:
+        return web.json_response({'status': 'error', 'msg': err or out or 'Failed to print test page.'}, status=500)
+    return web.json_response({'status': 'ok', 'msg': f'Test page sent to "{name}".'})
+
+
 @routes.put(config.URL_PREFIX + 'api/admin/printers/{name}')
 async def api_admin_modify_printer(request):
     _require_admin(request)
