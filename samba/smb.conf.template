@@ -20,7 +20,9 @@
    server string = Printers (%v)
    server role = standalone server
    security = user
-   map to guest = Never
+   map to guest = Bad User
+   guest account = nobody
+   restrict anonymous = 0
    force user = root
    passdb backend = tdbsam:/configs/samba/passdb.tdb
    smb passwd file = /configs/samba/smbpasswd
