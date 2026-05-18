@@ -42,22 +42,39 @@ seed_config() {
     fi
 }
 
-seed_config /etc/cups/cupsd.conf.template       "$CONFIG_DIR/cups/cupsd.conf"
-seed_config /etc/cups/cups-pdf.conf.template    "$CONFIG_DIR/cups/cups-pdf.conf"
-seed_config /etc/samba/smb.conf.template        "$CONFIG_DIR/samba/smb.conf"
+# ---------------------------------------------------------------------------
+# Persist the ENTIRE /etc/cups directory on the volume.
+# CUPS uses atomic writes (write printers.conf.N then rename) which breaks
+# individual file symlinks. By making /etc/cups itself a symlink to the
+# volume, all writes (including atomic renames) stay on persistent storage.
+# ---------------------------------------------------------------------------
 
-# Bind the persisted config into the well-known locations expected by the daemons.
-ln -sfn "$CONFIG_DIR/cups/cupsd.conf"     /etc/cups/cupsd.conf
-ln -sfn "$CONFIG_DIR/cups/cups-pdf.conf"  /etc/cups/cups-pdf.conf
-ln -sfn "$CONFIG_DIR/samba/smb.conf"      /etc/samba/smb.conf
+# Save image-provided templates before replacing /etc/cups
+mkdir -p /opt/templates
+cp -f /etc/cups/cupsd.conf.template /opt/templates/ 2>/dev/null || true
+cp -f /etc/cups/cups-pdf.conf.template /opt/templates/ 2>/dev/null || true
 
-# Persist CUPS dynamic state (printer definitions, PPDs) on /configs volume.
-# Without this, lpadmin-added printers disappear on container restart.
-ln -sfn "$CONFIG_DIR/cups/ppd"            /etc/cups/ppd
-touch "$CONFIG_DIR/cups/printers.conf"
-ln -sfn "$CONFIG_DIR/cups/printers.conf"  /etc/cups/printers.conf
-touch "$CONFIG_DIR/cups/classes.conf"
-ln -sfn "$CONFIG_DIR/cups/classes.conf"   /etc/cups/classes.conf
+# First boot: populate volume with distribution CUPS files
+if [ ! -f "$CONFIG_DIR/cups/mime.types" ]; then
+    echo "[entrypoint] first boot — populating $CONFIG_DIR/cups from image defaults"
+    cp -a /etc/cups/. "$CONFIG_DIR/cups/"
+fi
+mkdir -p "$CONFIG_DIR/cups/ppd"
+
+# Replace /etc/cups with symlink to the persistent volume
+rm -rf /etc/cups
+ln -sfn "$CONFIG_DIR/cups" /etc/cups
+
+# Seed/update configs from image templates (templates are newer after image update)
+seed_config /opt/templates/cupsd.conf.template      "$CONFIG_DIR/cups/cupsd.conf"
+seed_config /opt/templates/cups-pdf.conf.template   "$CONFIG_DIR/cups/cups-pdf.conf"
+# Keep templates on volume in sync with image (for timestamp comparison next boot)
+cp -f /opt/templates/cupsd.conf.template "$CONFIG_DIR/cups/cupsd.conf.template"
+cp -f /opt/templates/cups-pdf.conf.template "$CONFIG_DIR/cups/cups-pdf.conf.template"
+
+# Samba config
+seed_config /etc/samba/smb.conf.template "$CONFIG_DIR/samba/smb.conf"
+ln -sfn "$CONFIG_DIR/samba/smb.conf" /etc/samba/smb.conf
 
 # Pre-initialise the Samba passdb TDB so the very first smbpasswd -a call does
 # not fail with "tdbsam_open: Converting version 0.0 database" during bootstrap.
