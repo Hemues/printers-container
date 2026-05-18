@@ -1,13 +1,18 @@
-# Minimal Samba config — re-shares all CUPS queues to Windows clients with
-# username/password authentication. CUPS is the canonical source of truth
-# for printer state; smbd just passes jobs through.
+# Minimal Samba config — exposes CUPS queues to Windows clients as explicit
+# printer shares. CUPS is the canonical source of truth for printer state;
+# smbd just passes jobs through.
+#
+# NOTE: Samba's "load printers = yes" auto-discovery is unreliable inside
+# containers (race conditions, broken [printers] catch-all). Instead, the
+# Python backend manages explicit [PrinterName] sections below the marker
+# line. On container start the entrypoint also syncs existing CUPS queues.
 #
 # Authentication is "user" (per-share login), backed by smbpasswd which is
 # kept in sync by user_manager.set_smb_password() whenever a web user's
 # password changes.
 #
 # This file is templated into /configs/samba/smb.conf on first run, then
-# bind-mounted into /etc/samba/smb.conf so the smbpasswd database lives on
+# symlinked into /etc/samba/smb.conf so the smbpasswd database lives on
 # the /configs persistent volume.
 
 [global]
@@ -22,7 +27,7 @@
    private dir = /configs/samba/private
    state directory = /configs/samba/state
    cache directory = /configs/samba/cache
-   load printers = yes
+   load printers = no
    printing = cups
    printcap name = cups
    cups server = localhost:631
@@ -35,20 +40,11 @@
    client min protocol = SMB2
    server min protocol = SMB2
 
-[printers]
-   comment = Shared CUPS printers
-   path = /var/spool/samba
-   browseable = yes
-   guest ok = no
-   public = no
-   read only = yes
-   printable = yes
-   create mask = 0700
-   force user = root
-
 [print$]
    comment = Printer drivers
    path = /var/lib/samba/printers
    browseable = yes
    read only = yes
    guest ok = no
+
+# --- PRINTER SHARES (managed by backend — do not edit below this line) ---

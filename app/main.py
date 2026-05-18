@@ -70,6 +70,7 @@ import sys
 import asyncio
 import logging
 import json
+import re
 import socket
 import ssl
 import subprocess
@@ -219,6 +220,7 @@ routes = web.RouteTableDef()
 # Bootstrap user system
 # ---------------------------------------------------------------------------
 user_manager.bootstrap_admin()
+user_manager.ensure_unix_accounts()
 user_manager._load_all_sessions()
 
 
@@ -829,6 +831,82 @@ def _run(cmd: list[str], timeout: int = 30) -> tuple[int, str, str]:
         return 124, '', 'timeout'
 
 
+# ---------------------------------------------------------------------------
+# Samba explicit printer share management.
+# The smb.conf has a marker line after which we manage printer sections.
+# ---------------------------------------------------------------------------
+_SMB_CONF = os.path.join(CONFIG_DIR, 'samba', 'smb.conf')
+_SMB_MARKER = '# --- PRINTER SHARES (managed by backend — do not edit below this line) ---'
+
+
+def _smb_printer_block(name: str, comment: str = '') -> str:
+    """Generate a Samba [share] block for a CUPS printer."""
+    desc = comment or name
+    return (
+        f'\n[{name}]\n'
+        f'   comment = {desc}\n'
+        f'   path = /var/spool/samba\n'
+        f'   printable = yes\n'
+        f'   printer name = {name}\n'
+        f'   browseable = yes\n'
+        f'   guest ok = no\n'
+        f'   read only = yes\n'
+        f'   create mask = 0700\n'
+        f'   force user = root\n'
+    )
+
+
+def _sync_smb_share(name: str, action: str = 'add', comment: str = ''):
+    """Add or remove an explicit printer share in smb.conf, then reload Samba."""
+    if not os.path.isfile(_SMB_CONF):
+        log.warning(f'smb.conf not found at {_SMB_CONF}')
+        return
+    with open(_SMB_CONF, 'r') as f:
+        content = f.read()
+
+    # Split at marker
+    if _SMB_MARKER not in content:
+        # Append marker if missing (upgrade from older template)
+        content = content.rstrip() + '\n\n' + _SMB_MARKER + '\n'
+
+    before, _, after = content.partition(_SMB_MARKER)
+
+    # Parse existing printer sections from the "after" part
+    # Each section starts with \n[Name]\n
+    sections: dict[str, str] = {}
+    # Split on section headers
+    parts = re.split(r'\n(?=\[)', after)
+    for part in parts:
+        m = re.match(r'\[([^\]]+)\]', part.strip())
+        if m:
+            sections[m.group(1)] = '\n' + part.strip() + '\n'
+
+    if action == 'add':
+        sections[name] = _smb_printer_block(name, comment)
+    elif action == 'remove' and name in sections:
+        del sections[name]
+
+    # Rebuild
+    new_after = ''.join(sections.values())
+    new_content = before + _SMB_MARKER + '\n' + new_after
+
+    with open(_SMB_CONF, 'w') as f:
+        f.write(new_content)
+
+    # Reload Samba config
+    _run(['smbcontrol', 'all', 'reload-config'])
+    log.info(f'smb share {action}: {name}')
+
+
+def _sync_all_smb_shares():
+    """Sync all CUPS printers to smb.conf (used at startup)."""
+    printers = _parse_lpstat_printers()
+    for p in printers:
+        name = p.get('name', '')
+        if name:
+            _sync_smb_share(name, 'add')
+
+
 def _parse_lpstat_printers() -> list[dict]:
     """Parse `lpstat -p -v` to a structured list."""
     rc_p, out_p, _ = _run(['lpstat', '-p'])
@@ -1059,6 +1137,8 @@ async def api_admin_create_printer(request):
     _run(['cupsaccept', name])
     _run(['cupsenable', name])
     _run(['lpadmin', '-p', name, '-o', 'printer-is-shared=true'])
+    # Add explicit Samba share for this printer
+    _sync_smb_share(name, 'add', comment=description)
     return web.json_response({'status': 'ok', 'msg': f'Printer "{name}" created.'})
 
 
@@ -1069,6 +1149,8 @@ async def api_admin_delete_printer(request):
     rc, out, err = _run(['lpadmin', '-x', name])
     if rc != 0:
         return web.json_response({'status': 'error', 'msg': err or out}, status=500)
+    # Remove the Samba share for this printer
+    _sync_smb_share(name, 'remove')
     return web.json_response({'status': 'ok', 'msg': f'Printer "{name}" deleted.'})
 
 
@@ -1332,6 +1414,8 @@ def _access_log():
 
 
 if __name__ == '__main__':
+    # Sync existing CUPS printers to Samba smb.conf on startup
+    _sync_all_smb_shares()
     log.info(f'Printers v{CONTAINER_VERSION} listening on {config.HOST}:{config.PORT}')
     if config.HTTPS:
         ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)

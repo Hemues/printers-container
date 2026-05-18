@@ -299,6 +299,30 @@ def bootstrap_admin():
     return True
 
 
+def ensure_unix_accounts():
+    """Ensure Unix accounts exist for all users in the database.
+
+    On container recreation (podman rm + run) the image /etc/passwd is fresh
+    but the persistent volume still holds users.json and Samba passdb.tdb.
+    This re-creates the system accounts so Samba auth works immediately.
+    """
+    import subprocess as _sp
+    users = _load_users()
+    for u in users:
+        username = u.get('username', '')
+        if not username:
+            continue
+        try:
+            _sp.run(['id', username], check=True, capture_output=True)
+        except _sp.CalledProcessError:
+            _sp.run(
+                ['useradd', '--system', '--no-create-home',
+                 '--shell', '/usr/sbin/nologin', username],
+                capture_output=True,
+            )
+            log.debug(f'recreated Unix account for {username}')
+
+
 def authenticate(username: str, password: str) -> tuple[dict | None, str | None]:
     """Return (user_dict, None) on success, or (None, error_message) on failure."""
     users = _load_users()

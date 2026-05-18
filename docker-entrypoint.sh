@@ -76,6 +76,9 @@ cp -f /opt/templates/cups-pdf.conf.template "$CONFIG_DIR/cups/cups-pdf.conf.temp
 seed_config /etc/samba/smb.conf.template "$CONFIG_DIR/samba/smb.conf"
 ln -sfn "$CONFIG_DIR/samba/smb.conf" /etc/samba/smb.conf
 
+# Fix Samba state/cache permissions (required for share browsing).
+chmod 0755 "$CONFIG_DIR/samba/state" "$CONFIG_DIR/samba/cache"
+
 # Pre-initialise the Samba passdb TDB so the very first smbpasswd -a call does
 # not fail with "tdbsam_open: Converting version 0.0 database" during bootstrap.
 # pdbedit -L just lists users (empty is fine) and creates a valid TDB schema.
@@ -91,6 +94,13 @@ install -m 0755 /app/cups-pdf-postprocess.sh /usr/local/bin/cups-pdf-postprocess
 echo "[entrypoint] starting cupsd …"
 /usr/sbin/cupsd -f -c /etc/cups/cupsd.conf &
 CUPSD_PID=$!
+
+# Wait for CUPS to be ready before starting Samba (the Python backend will
+# sync CUPS printers into smb.conf and reload Samba on startup).
+for i in 1 2 3 4 5; do
+    lpstat -r >/dev/null 2>&1 && break
+    sleep 1
+done
 
 # ---------------------------------------------------------------------------
 # Start Samba (smbd + nmbd) in the background.
