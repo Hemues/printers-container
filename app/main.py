@@ -1002,7 +1002,7 @@ async def api_admin_disable_printer(request):
 async def api_admin_print_test_page(request):
     _require_admin(request)
     name = request.match_info['name']
-    rc, out, err = _run(['lp', '-d', name, '/usr/share/cups/data/testprint.ps'])
+    rc, out, err = _run(['lp', '-d', name, '/usr/share/cups/data/default-testpage.pdf'])
     if rc != 0:
         return web.json_response({'status': 'error', 'msg': err or out or 'Failed to print test page.'}, status=500)
     return web.json_response({'status': 'ok', 'msg': f'Test page sent to "{name}".'})
