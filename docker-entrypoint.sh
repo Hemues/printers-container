@@ -18,7 +18,9 @@ CONFIG_DIR="${CONFIG_DIR:-/configs}"
 LOG_DIR="${LOG_DIR:-/logs}"
 
 mkdir -p "$PRINTINGS_DIR" "$CONFIG_DIR" "$LOG_DIR"
-mkdir -p "$CONFIG_DIR/cups" "$CONFIG_DIR/samba" "$CONFIG_DIR/samba/private" \
+mkdir -p "$CONFIG_DIR/cups" "$CONFIG_DIR/cups/ppd" \
+         "$CONFIG_DIR/samba" "$CONFIG_DIR/samba/private" \
+         "$CONFIG_DIR/samba/state" "$CONFIG_DIR/samba/cache" \
          "$CONFIG_DIR/database/global" \
          "$LOG_DIR/samba" "$LOG_DIR/cups"
 mkdir -p /var/spool/cups-pdf/INBOX /var/spool/cups-pdf/SPOOL /var/spool/cups-pdf/ANONYMOUS
@@ -44,6 +46,14 @@ seed_config /etc/samba/smb.conf.template        "$CONFIG_DIR/samba/smb.conf"
 ln -sfn "$CONFIG_DIR/cups/cupsd.conf"     /etc/cups/cupsd.conf
 ln -sfn "$CONFIG_DIR/cups/cups-pdf.conf"  /etc/cups/cups-pdf.conf
 ln -sfn "$CONFIG_DIR/samba/smb.conf"      /etc/samba/smb.conf
+
+# Persist CUPS dynamic state (printer definitions, PPDs) on /configs volume.
+# Without this, lpadmin-added printers disappear on container restart.
+ln -sfn "$CONFIG_DIR/cups/ppd"            /etc/cups/ppd
+touch "$CONFIG_DIR/cups/printers.conf"
+ln -sfn "$CONFIG_DIR/cups/printers.conf"  /etc/cups/printers.conf
+touch "$CONFIG_DIR/cups/classes.conf"
+ln -sfn "$CONFIG_DIR/cups/classes.conf"   /etc/cups/classes.conf
 
 # Pre-initialise the Samba passdb TDB so the very first smbpasswd -a call does
 # not fail with "tdbsam_open: Converting version 0.0 database" during bootstrap.

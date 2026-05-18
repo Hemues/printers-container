@@ -19,6 +19,8 @@
    passdb backend = tdbsam:/configs/samba/passdb.tdb
    smb passwd file = /configs/samba/smbpasswd
    private dir = /configs/samba/private
+   state directory = /configs/samba/state
+   cache directory = /configs/samba/cache
    load printers = yes
    printing = cups
    printcap name = cups

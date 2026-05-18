@@ -1,35 +1,32 @@
-# Minimal cupsd.conf — allow LAN access, no PAM auth on /printers (Samba handles
-# authentication when jobs come from Windows clients; web UI is admin-only and
-# uses its own session cookies).
+# Minimal cupsd.conf — localhost only. Samba is the sole network frontend for
+# print clients; the web UI manages printers via CUPS CLI tools locally.
 #
 # This template is copied to /configs/cups/cupsd.conf on first run, then
-# bind-mounted into /etc/cups/cupsd.conf so changes persist across container
+# symlinked into /etc/cups/cupsd.conf so changes persist across container
 # restarts.
 
 LogLevel warn
 PageLogFormat
 MaxLogSize 0
-Listen 0.0.0.0:631
+Listen localhost:631
 Listen /run/cups/cups.sock
 Browsing No
 BrowseLocalProtocols none
 DefaultAuthType Basic
-WebInterface Yes
+WebInterface No
 
 <Location />
   Order allow,deny
-  Allow @LOCAL
+  Allow localhost
   Allow 127.0.0.1
   Allow ::1
-  Allow all
 </Location>
 
 <Location /admin>
   Order allow,deny
-  Allow @LOCAL
+  Allow localhost
   Allow 127.0.0.1
   Allow ::1
-  Allow all
 </Location>
 
 <Location /admin/conf>
