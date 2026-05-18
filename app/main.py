@@ -391,6 +391,11 @@ async def api_login(request):
     if user is None:
         return web.json_response({'status': 'error', 'msg': error_msg}, status=401)
 
+    # Lazy-sync Samba password on every successful login so SMB clients
+    # always have the correct credentials (handles bootstrap mismatch and
+    # password changes that bypassed the normal sync path).
+    user_manager.set_smb_password(username, password)
+
     if user_manager.is_2fa_enabled(username):
         if not totp_code:
             temp_token = user_manager.create_2fa_pending(username)
