@@ -26,6 +26,9 @@ mkdir -p "$CONFIG_DIR/cups" "$CONFIG_DIR/cups/ppd" \
 mkdir -p /var/spool/cups-pdf/INBOX /var/spool/cups-pdf/SPOOL /var/spool/cups-pdf/ANONYMOUS
 mkdir -p /var/spool/samba /var/lib/samba/printers /run/cups /run/samba /run/samba/msg.lock
 chmod 0755 /run/samba /run/samba/msg.lock
+chmod 1777 /var/spool/samba /tmp
+# Remove restrictive ACLs inherited from rootless Podman overlay layers.
+setfacl -b /tmp /var/spool/samba 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # Seed configs from templates the first time (or when the template is newer).

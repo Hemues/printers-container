@@ -16,6 +16,7 @@
    server role = standalone server
    security = user
    map to guest = Never
+   force user = root
    passdb backend = tdbsam:/configs/samba/passdb.tdb
    smb passwd file = /configs/samba/smbpasswd
    private dir = /configs/samba/private
