@@ -55,7 +55,7 @@ cp -f /etc/cups/cupsd.conf.template /opt/templates/ 2>/dev/null || true
 cp -f /etc/cups/cups-pdf.conf.template /opt/templates/ 2>/dev/null || true
 
 # First boot: populate volume with distribution CUPS files
-if [ ! -f "$CONFIG_DIR/cups/mime.types" ]; then
+if [ ! -f "$CONFIG_DIR/cups/cups-files.conf" ]; then
     echo "[entrypoint] first boot — populating $CONFIG_DIR/cups from image defaults"
     cp -a /etc/cups/. "$CONFIG_DIR/cups/"
 fi
