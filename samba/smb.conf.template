@@ -62,4 +62,11 @@
    read only = yes
    guest ok = no
 
+[ipp-printers]
+   comment = Double-click to install printer (IPP, no registry needed)
+   path = /configs/client-setup/ipp-printers
+   browseable = yes
+   read only = yes
+   guest ok = no
+
 # --- PRINTER SHARES (managed by backend — do not edit below this line) ---

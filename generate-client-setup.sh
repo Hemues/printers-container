@@ -550,4 +550,122 @@ ABOUT PrintNightmare (CVE-2021-34527):
 EOF
 
 echo "[client-setup] Generated: $PS_DIR/README.txt"
-echo "[client-setup] Done. Shares ready at: $REG_DIR and $PS_DIR"
+
+# ---------------------------------------------------------------------------
+# Generate per-printer .cmd files for double-click install/open-queue.
+# These go in a dedicated share so users can browse and double-click.
+# ---------------------------------------------------------------------------
+CLICK_DIR="$SETUP_DIR/ipp-printers"
+mkdir -p "$CLICK_DIR"
+
+# Clean old .cmd files (printers may have been removed)
+rm -f "$CLICK_DIR"/*.cmd "$CLICK_DIR"/README.txt
+
+PRIMARY_ADDR=$(echo "$ADDRESSES" | head -1)
+
+echo "$PRINTER_LIST" | tr ',' '\n' | while read -r PNAME; do
+    [ -z "$PNAME" ] && continue
+    CMD_FILE="$CLICK_DIR/${PNAME}.cmd"
+    cat > "$CMD_FILE" << CMDEOF
+@echo off
+setlocal
+REM === ${PNAME} — Double-click to install or open print queue ===
+REM Server: ${PRIMARY_ADDR}:631 | Protocol: IPP | Driver: Microsoft IPP Class Driver
+REM No registry changes required. Capabilities (duplex/color/paper) auto-detected.
+
+set "PRINTER_NAME=${PNAME} (${PRIMARY_ADDR})"
+set "IPP_URL=http://${PRIMARY_ADDR}:631/printers/${PNAME}"
+
+REM Check if printer is already installed
+powershell -NoProfile -Command "if (Get-Printer -Name '%PRINTER_NAME%' -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+if %errorlevel% equ 0 (
+    echo.
+    echo   Printer "%PRINTER_NAME%" is already installed.
+    echo   Opening print queue...
+    echo.
+    rundll32 printui.dll,PrintUIEntry /o /n "%PRINTER_NAME%"
+    exit /b 0
+)
+
+echo.
+echo   ================================================================
+echo   Installing printer: %PRINTER_NAME%
+echo   Server: %IPP_URL%
+echo   Driver: Microsoft IPP Class Driver (built-in, auto-detects caps)
+echo   ================================================================
+echo.
+echo   This will detect: duplex, color/BW, paper sizes, quality settings
+echo.
+echo   Administrator rights are required for first-time installation.
+echo   You will see a UAC prompt if not running as admin.
+echo.
+
+REM Try to install - needs elevation
+powershell -NoProfile -Command ^
+  "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile -ExecutionPolicy Bypass -Command ""rundll32.exe printui.dll,PrintUIEntry /if /b \\\"%PRINTER_NAME%\\\" /r \\\"%IPP_URL%\\\" /m \\\"Microsoft IPP Class Driver\\\"; Start-Sleep 2; if (Get-Printer -Name \\\"%PRINTER_NAME%\\\" -ErrorAction SilentlyContinue) { Write-Host \\\"[OK] Printer installed!\\\" -Fore Green } else { Write-Host \\\"[TRYING FALLBACK]\\\" -Fore Yellow; Add-PrinterPort -Name \\\"%IPP_URL%\\\" -PrinterHostAddress \\\"%PRIMARY_ADDR%\\\" -PortNumber 631 -ErrorAction SilentlyContinue; Add-Printer -Name \\\"%PRINTER_NAME%\\\" -DriverName \\\"Microsoft IPP Class Driver\\\" -PortName \\\"%IPP_URL%\\\" }""'"
+
+REM Verify installation
+timeout /t 2 /nobreak >nul
+powershell -NoProfile -Command "if (Get-Printer -Name '%PRINTER_NAME%' -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+if %errorlevel% equ 0 (
+    echo.
+    echo   [OK] Printer installed successfully!
+    echo   Opening print queue...
+    rundll32 printui.dll,PrintUIEntry /o /n "%PRINTER_NAME%"
+) else (
+    echo.
+    echo   [!] Automated install may have failed.
+    echo.
+    echo   MANUAL FALLBACK:
+    echo     1. Open Settings ^> Bluetooth ^& Devices ^> Printers
+    echo     2. Click "Add device" then "Add manually"
+    echo     3. Select "Add a printer using an IP address or hostname"
+    echo     4. Device type: IPP Device
+    echo     5. Hostname: ${PRIMARY_ADDR}   Port: 631
+    echo     6. Queue: /printers/${PNAME}
+    echo     7. Capabilities will be auto-detected
+    echo.
+    pause
+)
+CMDEOF
+    echo "[client-setup] Generated: $CMD_FILE"
+done
+
+# README for the ipp-printers share
+cat > "$CLICK_DIR/README.txt" << EOF
+================================================================================
+  IPP PRINTERS — Double-Click to Install or Open Queue
+================================================================================
+
+  Server: $PRIMARY_ADDR
+  Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+HOW TO USE:
+  1. Browse this folder (\\\\${PRIMARY_ADDR}\\ipp-printers)
+  2. Double-click the printer you want (e.g., laser.cmd)
+  3. First time: confirms UAC → installs via IPP → opens queue
+     Already installed: just opens the print queue
+
+WHAT HAPPENS ON INSTALL:
+  - Uses Microsoft IPP Class Driver (built into Windows 10/11)
+  - NO registry changes needed
+  - NO driver download from server
+  - Auto-detects capabilities from the print server:
+      * Duplex (two-sided printing)
+      * Color vs Black & White
+      * Paper sizes (A4, Letter, Legal, etc.)
+      * Print quality settings
+      * Tray selection
+
+AUTHENTICATION:
+  When you print for the first time, Windows will prompt for credentials.
+  Use the same login as the web UI (http://${PRIMARY_ADDR}:8082).
+  Windows remembers them permanently.
+
+PRINT HISTORY:
+  View what you printed at: http://${PRIMARY_ADDR}:8082
+================================================================================
+EOF
+
+echo "[client-setup] Generated: $CLICK_DIR/README.txt"
+echo "[client-setup] Done. Shares ready at: $REG_DIR, $PS_DIR, $CLICK_DIR"
