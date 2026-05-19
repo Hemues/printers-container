@@ -546,6 +546,27 @@ ABOUT PrintNightmare (CVE-2021-34527):
 
   The IPP method (Option 1) completely sidesteps these restrictions because
   it uses Windows' own built-in driver — no external driver download needed.
+
+PRINT JOB LOGGING:
+  Both installation methods (IPP and Samba) log print jobs to the SAME
+  database in the SAME format. The logging happens at the CUPS level,
+  which is the common path for ALL print jobs regardless of source:
+
+    Samba path: Windows -> SMB auth -> Samba -> CUPS queue -> log
+    IPP path:   Windows -> HTTP auth -> CUPS queue directly -> log
+    Double-click (.cmd): Same as IPP path above
+
+  Every print job is recorded with:
+    - Username (who printed)
+    - Document title
+    - Page count
+    - Color mode (color / black & white)
+    - Printer name (which queue)
+    - Timestamp (when)
+    - File size
+
+  View your print history at: http://$(echo "$ADDRESSES" | head -1):8082
+  Same credentials work for printing AND viewing the web UI.
 ================================================================================
 EOF
 
@@ -662,6 +683,22 @@ AUTHENTICATION:
   When you print for the first time, Windows will prompt for credentials.
   Use the same login as the web UI (http://${PRIMARY_ADDR}:8082).
   Windows remembers them permanently.
+
+PRINT JOB LOGGING (same for ALL methods — Samba, IPP, .cmd):
+  Every print job is recorded regardless of how the printer was installed:
+    - Username: who printed (from authentication)
+    - Document: original document title
+    - Pages: total page count
+    - Color: color or black & white
+    - Printer: which printer was used
+    - When: date and time
+    - Size: file size
+
+  Both Samba and IPP paths go through the same CUPS print queue.
+  The logging system captures jobs at the CUPS level, so the database
+  and format are identical no matter which client method you use.
+
+  Same credentials for: printing + web UI (view history)
 
 PRINT HISTORY:
   View what you printed at: http://${PRIMARY_ADDR}:8082
