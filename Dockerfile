@@ -55,6 +55,7 @@ RUN sed -i 's/\r$//g' docker-entrypoint.sh && \
       poppler-utils \
       samba \
       samba-common-bin \
+      smbclient \
       libnss-winbind \
       libpam-winbind \
       acl \
@@ -93,7 +94,7 @@ VOLUME /printings
 VOLUME /configs
 VOLUME /logs
 
-EXPOSE 8082 137/udp 138/udp 139 445
+EXPOSE 8082 631 137/udp 138/udp 139 445
 
 # Add build-time argument for version
 ARG VERSION=dev

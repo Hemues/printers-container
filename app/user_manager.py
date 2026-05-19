@@ -1773,9 +1773,42 @@ def send_new_password_email(to_email: str, username: str, new_password: str) -> 
 # ---------------------------------------------------------------------------
 # Samba password sync
 # ---------------------------------------------------------------------------
+def set_unix_password(username: str, password: str) -> bool:
+    """Set the Unix password for *username* so CUPS PAM authentication
+    works with the same credentials as the web UI.
+
+    Uses `chpasswd` which reads 'username:password' from stdin.
+    The Unix account must already exist (created by set_smb_password)."""
+    import shutil as _shutil
+    import subprocess as _sp
+    chpasswd = _shutil.which('chpasswd')
+    if chpasswd is None:
+        log.debug('chpasswd binary not found — skipping Unix password sync')
+        return False
+    try:
+        proc = _sp.run(
+            [chpasswd],
+            input=f'{username}:{password}\n'.encode(),
+            capture_output=True, timeout=10,
+        )
+        if proc.returncode != 0:
+            log.warning(f'chpasswd for {username} failed: '
+                        f'{proc.stderr.decode(errors="replace")}')
+            return False
+        return True
+    except _sp.TimeoutExpired:
+        log.warning(f'chpasswd timed out for {username}')
+        return False
+    except Exception as exc:
+        log.warning(f'chpasswd exception for {username}: {exc}')
+        return False
+
+
 def set_smb_password(username: str, password: str) -> bool:
     """Add or update *username* in the Samba passdb so SMB print clients
     can authenticate with the same password as the web UI.
+
+    Also syncs the Unix password (for CUPS PAM auth) via set_unix_password().
 
     Uses `smbpasswd -a -s` (script mode reads passwd from stdin twice).
     Falls back silently when smbpasswd is missing (e.g. during local
@@ -1809,6 +1842,8 @@ def set_smb_password(username: str, password: str) -> bool:
             return False
         # Make sure account is enabled (a fresh add may be disabled).
         _sp.run([smbpasswd, '-e', username], capture_output=True, timeout=10)
+        # Sync Unix password so CUPS PAM auth uses the same credentials.
+        set_unix_password(username, password)
         return True
     except _sp.TimeoutExpired:
         log.warning(f'smbpasswd timed out for {username}')

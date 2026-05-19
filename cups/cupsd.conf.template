@@ -1,5 +1,5 @@
-# Minimal cupsd.conf — localhost only. Samba is the sole network frontend for
-# print clients; the web UI manages printers via CUPS CLI tools locally.
+# CUPS configuration — network IPP enabled for Windows/Linux clients.
+# Samba is available as alternative (SMB) frontend; CUPS provides native IPP.
 #
 # This template is copied to /configs/cups/cupsd.conf on first run, then
 # symlinked into /etc/cups/cupsd.conf so changes persist across container
@@ -8,18 +8,17 @@
 LogLevel warn
 PageLogFormat
 MaxLogSize 0
-Listen localhost:631
+Port 631
 Listen /run/cups/cups.sock
-Browsing No
-BrowseLocalProtocols none
+Browsing Yes
+BrowseLocalProtocols dnssd
 DefaultAuthType Basic
 WebInterface No
+ServerAlias *
 
 <Location />
   Order allow,deny
-  Allow localhost
-  Allow 127.0.0.1
-  Allow ::1
+  Allow @LOCAL
 </Location>
 
 <Location /admin>
@@ -33,9 +32,16 @@ WebInterface No
   AuthType Default
   Require user @SYSTEM
   Order allow,deny
-  Allow @LOCAL
+  Allow localhost
   Allow 127.0.0.1
   Allow ::1
+</Location>
+
+<Location /printers>
+  AuthType Basic
+  Require valid-user
+  Order allow,deny
+  Allow @LOCAL
 </Location>
 
 <Policy default>
@@ -45,6 +51,8 @@ WebInterface No
   SubscriptionPrivateValues default
 
   <Limit Create-Job Print-Job Print-URI Validate-Job>
+    AuthType Basic
+    Require valid-user
     Order deny,allow
   </Limit>
 
