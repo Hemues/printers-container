@@ -587,53 +587,115 @@ PRIMARY_ADDR=$(echo "$ADDRESSES" | head -1)
 echo "$PRINTER_LIST" | tr ',' '\n' | while read -r PNAME; do
     [ -z "$PNAME" ] && continue
     CMD_FILE="$CLICK_DIR/${PNAME}.cmd"
+    PS1_FILE="$CLICK_DIR/${PNAME}-install.ps1"
+
+    # --- Generate the PowerShell install script (no quoting issues) ---
+    cat > "$PS1_FILE" << 'PS1EOF'
+# Auto-generated IPP printer installer — run elevated
+param(
+    [string]$PrinterName,
+    [string]$IppUrl,
+    [string]$ServerHost
+)
+$ErrorActionPreference = 'Stop'
+
+Write-Host "Installing: $PrinterName" -ForegroundColor Cyan
+Write-Host "Server:     $IppUrl" -ForegroundColor Cyan
+Write-Host ""
+
+# Check if already installed
+$existing = Get-Printer -Name $PrinterName -ErrorAction SilentlyContinue
+if ($existing) {
+    Write-Host "[OK] Printer '$PrinterName' is already installed." -ForegroundColor Green
+    exit 0
+}
+
+try {
+    # Method 1: Add-Printer with IPP port
+    Write-Host "Creating printer port..." -ForegroundColor Yellow
+    $portExists = Get-PrinterPort -Name $IppUrl -ErrorAction SilentlyContinue
+    if (-not $portExists) {
+        Add-PrinterPort -Name $IppUrl -PrinterHostAddress $ServerHost -PortNumber 631
+    }
+    Write-Host "Adding printer with Microsoft IPP Class Driver..." -ForegroundColor Yellow
+    Add-Printer -Name $PrinterName -DriverName "Microsoft IPP Class Driver" -PortName $IppUrl
+    Write-Host ""
+    Write-Host "[OK] Printer '$PrinterName' installed successfully!" -ForegroundColor Green
+} catch {
+    Write-Host "[!] Method 1 failed: $_" -ForegroundColor Yellow
+    Write-Host "Trying alternative method (printui)..." -ForegroundColor Yellow
+    try {
+        $argStr = "printui.dll,PrintUIEntry /if /b `"$PrinterName`" /r `"$IppUrl`" /m `"Microsoft IPP Class Driver`""
+        $proc = Start-Process rundll32.exe -ArgumentList $argStr -Wait -PassThru -NoNewWindow
+        if ($proc.ExitCode -ne 0) { throw "printui exit code: $($proc.ExitCode)" }
+        Write-Host "[OK] Installed via printui!" -ForegroundColor Green
+    } catch {
+        Write-Host ""
+        Write-Host "[FAIL] Both methods failed: $_" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "MANUAL INSTALL:" -ForegroundColor White
+        Write-Host "  Settings > Printers > Add device > Add manually"
+        Write-Host "  Type: IPP Device | Host: $ServerHost | Port: 631"
+        Write-Host "  Queue: /printers/$($PrinterName.Split(' ')[0])"
+        Write-Host ""
+        Read-Host "Press Enter to close"
+        exit 1
+    }
+}
+PS1EOF
+
+    # --- Generate the .cmd launcher ---
     cat > "$CMD_FILE" << CMDEOF
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 REM === ${PNAME} — Double-click to install or open print queue ===
 REM Server: ${PRIMARY_ADDR}:631 | Protocol: IPP | Driver: Microsoft IPP Class Driver
-REM No registry changes required. Capabilities (duplex/color/paper) auto-detected.
 
-set "PRINTER_NAME=${PNAME} (${PRIMARY_ADDR})"
+REM Handle UNC path (network share) — pushd maps a temp drive letter
+pushd "%~dp0" 2>nul || cd /d "%SystemRoot%"
+
+set "PRINTER_NAME=${PNAME} on ${PRIMARY_ADDR}"
 set "IPP_URL=http://${PRIMARY_ADDR}:631/printers/${PNAME}"
 set "SERVER_HOST=${PRIMARY_ADDR}"
 
 REM Check if printer is already installed
-powershell -NoProfile -Command "if (Get-Printer -Name '%PRINTER_NAME%' -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
-if %errorlevel% equ 0 (
+powershell -NoProfile -Command "if (Get-Printer -Name '!PRINTER_NAME!' -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+if !errorlevel! equ 0 (
     echo.
-    echo   Printer "%PRINTER_NAME%" is already installed.
+    echo   Printer "!PRINTER_NAME!" is already installed.
     echo   Opening print queue...
     echo.
-    rundll32 printui.dll,PrintUIEntry /o /n "%PRINTER_NAME%"
-    exit /b 0
+    rundll32 printui.dll,PrintUIEntry /o /n "!PRINTER_NAME!"
+    goto :end
 )
 
 echo.
 echo   ================================================================
-echo   Installing printer: %PRINTER_NAME%
-echo   Server: %IPP_URL%
+echo   Installing printer: !PRINTER_NAME!
+echo   Server: !IPP_URL!
 echo   Driver: Microsoft IPP Class Driver (built-in, auto-detects caps)
 echo   ================================================================
-echo.
-echo   This will detect: duplex, color/BW, paper sizes, quality settings
 echo.
 echo   Administrator rights are required for first-time installation.
 echo   You will see a UAC prompt if not running as admin.
 echo.
 
-REM Try to install - needs elevation
-powershell -NoProfile -Command ^
-  "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile -ExecutionPolicy Bypass -Command ""rundll32.exe printui.dll,PrintUIEntry /if /b \\\"%PRINTER_NAME%\\\" /r \\\"%IPP_URL%\\\" /m \\\"Microsoft IPP Class Driver\\\"; Start-Sleep 2; if (Get-Printer -Name \\\"%PRINTER_NAME%\\\" -ErrorAction SilentlyContinue) { Write-Host \\\"[OK] Printer installed!\\\" -Fore Green } else { Write-Host \\\"[TRYING FALLBACK]\\\" -Fore Yellow; Add-PrinterPort -Name \\\"%IPP_URL%\\\" -PrinterHostAddress \\\"%SERVER_HOST%\\\" -PortNumber 631 -ErrorAction SilentlyContinue; Add-Printer -Name \\\"%PRINTER_NAME%\\\" -DriverName \\\"Microsoft IPP Class Driver\\\" -PortName \\\"%IPP_URL%\\\" }""'"
+REM Copy install script to temp (in case UNC not accessible from elevated context)
+set "INSTALL_PS1=%TEMP%\install-${PNAME}-%RANDOM%.ps1"
+copy "%~dp0${PNAME}-install.ps1" "!INSTALL_PS1!" >nul 2>&1
+
+REM Run elevated with parameters
+powershell -NoProfile -Command "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"!INSTALL_PS1!\" -PrinterName \"!PRINTER_NAME!\" -IppUrl \"!IPP_URL!\" -ServerHost \"!SERVER_HOST!\"'"
+del "!INSTALL_PS1!" 2>nul
 
 REM Verify installation
-timeout /t 2 /nobreak >nul
-powershell -NoProfile -Command "if (Get-Printer -Name '%PRINTER_NAME%' -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
-if %errorlevel% equ 0 (
+timeout /t 3 /nobreak >nul
+powershell -NoProfile -Command "if (Get-Printer -Name '!PRINTER_NAME!' -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+if !errorlevel! equ 0 (
     echo.
     echo   [OK] Printer installed successfully!
     echo   Opening print queue...
-    rundll32 printui.dll,PrintUIEntry /o /n "%PRINTER_NAME%"
+    rundll32 printui.dll,PrintUIEntry /o /n "!PRINTER_NAME!"
 ) else (
     echo.
     echo   [!] Automated install may have failed.
@@ -649,8 +711,12 @@ if %errorlevel% equ 0 (
     echo.
     pause
 )
+
+:end
+popd 2>nul
+endlocal
 CMDEOF
-    echo "[client-setup] Generated: $CMD_FILE"
+    echo "[client-setup] Generated: $CMD_FILE, $PS1_FILE"
 done
 
 # README for the ipp-printers share
