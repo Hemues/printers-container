@@ -39,7 +39,7 @@ HP_UPD_PCL6_DRIVER_NAME = 'HP Universal Printing PCL 6'
 HP_UPD_PS_DRIVER_NAME = 'HP Universal Printing PS'
 
 # Model-to-driver mapping
-_HP_MODELS = re.compile(r'(?i)\bhp\b|(?i)\blaserjet\b|(?i)\bofficejet\b|(?i)\bdeskjet\b|(?i)\bcolor\s*laser', re.IGNORECASE)
+_HP_MODELS = re.compile(r'\bhp\b|\blaserjet\b|\bofficejet\b|\bdeskjet\b|\bcolor\s*laser', re.IGNORECASE)
 
 
 def ensure_dirs():
