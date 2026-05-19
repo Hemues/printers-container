@@ -79,6 +79,15 @@ ln -sfn "$CONFIG_DIR/samba/smb.conf" /etc/samba/smb.conf
 # Fix Samba state/cache permissions (required for share browsing).
 chmod 0755 "$CONFIG_DIR/samba/state" "$CONFIG_DIR/samba/cache"
 
+# ---------------------------------------------------------------------------
+# Persist printer drivers (print$ share) on the volume.
+# Windows driver files served to clients survive container updates.
+# ---------------------------------------------------------------------------
+mkdir -p "$CONFIG_DIR/samba/drivers/x64" "$CONFIG_DIR/samba/drivers/W32X86" \
+         "$CONFIG_DIR/samba/drivers/color" "$CONFIG_DIR/samba/drivers/cache"
+rm -rf /var/lib/samba/printers
+ln -sfn "$CONFIG_DIR/samba/drivers" /var/lib/samba/printers
+
 # Pre-initialise the Samba passdb TDB so the very first smbpasswd -a call does
 # not fail with "tdbsam_open: Converting version 0.0 database" during bootstrap.
 # pdbedit -L just lists users (empty is fine) and creates a valid TDB schema.

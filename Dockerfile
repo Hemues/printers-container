@@ -58,6 +58,7 @@ RUN sed -i 's/\r$//g' docker-entrypoint.sh && \
       libnss-winbind \
       libpam-winbind \
       acl \
+      p7zip-full \
       coreutils && \
     python3 -m venv /opt/venv && \
     /opt/venv/bin/pip install --no-cache-dir aiohttp 'python-socketio>=5.0,<6.0' pyotp 'qrcode[pil]' && \

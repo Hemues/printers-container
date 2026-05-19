@@ -84,6 +84,7 @@ from aiohttp.log import access_logger
 
 from printer_engine import PrintCapture, PrintJob, PrintQueueNotifier
 import user_manager
+import driver_manager
 
 log = logging.getLogger('main')
 
@@ -1259,7 +1260,49 @@ async def api_admin_detect_printer(request):
                 result['model'] = model
                 result['method'] = 'ipp'
     result['status'] = 'ok' if result['model'] else 'not_detected'
+    # Include driver suggestion if model detected
+    if result.get('model'):
+        result['suggested_driver'] = driver_manager.suggest_driver_for_model(result['model'])
     return web.json_response(result)
+
+
+@routes.post(config.URL_PREFIX + 'api/admin/printers/{name}/install-driver')
+async def api_admin_install_driver(request):
+    """Download, extract, register and associate a Windows driver for a printer."""
+    _require_admin(request)
+    name = request.match_info['name']
+    post = await request.json() if request.content_length else {}
+
+    # Get the model (from request body or auto-detect)
+    model = post.get('model', '')
+    url = post.get('url', '')
+    drv_name = post.get('driver_name', '')
+
+    if not model and not url:
+        # Auto-detect from printer URI
+        rc, out, _ = _run(['lpstat', '-v', name])
+        uri = ''
+        for line in (out or '').splitlines():
+            if line.startswith('device for '):
+                rest = line[len('device for '):]
+                if ':' in rest:
+                    uri = rest.split(':', 1)[1].strip()
+                    break
+        if uri:
+            detection = _detect_printer_model(uri)
+            model = detection.get('model', '')
+
+    result = driver_manager.install_driver_for_printer(name, model=model, url=url, driver_name=drv_name)
+    status_code = 200 if result.get('status') == 'ok' else 500 if result.get('status') == 'error' else 207
+    return web.json_response(result, status=status_code)
+
+
+@routes.get(config.URL_PREFIX + 'api/admin/printers/drivers/installed')
+async def api_admin_installed_drivers(request):
+    """List Windows drivers installed on the server."""
+    _require_admin(request)
+    drivers = driver_manager.get_installed_drivers()
+    return web.json_response({'status': 'ok', 'drivers': drivers})
 
 
 @routes.get(config.URL_PREFIX + 'api/admin/printers')
