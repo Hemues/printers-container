@@ -13,6 +13,7 @@ Listen /run/cups/cups.sock
 Browsing Yes
 BrowseLocalProtocols dnssd
 DefaultAuthType Basic
+DefaultEncryption Never
 WebInterface No
 ServerAlias *
 
