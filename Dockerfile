@@ -63,7 +63,10 @@ RUN sed -i 's/\r$//g' docker-entrypoint.sh && \
     python3 -m venv /opt/venv && \
     /opt/venv/bin/pip install --no-cache-dir aiohttp 'python-socketio>=5.0,<6.0' pyotp 'qrcode[pil]' && \
     rm -rf /var/lib/apt/lists/* && \
-    mkdir /.cache && chmod 777 /.cache
+    mkdir /.cache && chmod 777 /.cache && \
+    # CUPS network backends must be mode 700 so cupsd runs them as root; \
+    # in rootless podman the 'lp' user can't load shared libraries. \
+    chmod 700 /usr/lib/cups/backend/socket /usr/lib/cups/backend/ipp /usr/lib/cups/backend/lpd 2>/dev/null || true
 
 # Set up Python venv in PATH
 ENV PATH="/opt/venv/bin:$PATH"
