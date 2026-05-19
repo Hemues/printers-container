@@ -589,17 +589,39 @@ interface SettingEntry {
                       <input type="text" class="form-control" [(ngModel)]="wizardLocation" placeholder="Office 2.04">
                     </div>
                     <div class="mb-2">
-                      <label class="form-label small mb-0">Driver (PPD)</label>
+                      <label class="form-label small mb-0">Driver (PPD) — determines how print jobs are processed</label>
                       @if (wizardDriversLoading) {
                         <div class="small text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Loading drivers…</div>
                       } @else {
                         <select class="form-select" [(ngModel)]="wizardSelectedPpd">
-                          <option value="/usr/share/ppd/cups-pdf/CUPS-PDF_opt.ppd">CUPS-PDF (generic PDF — recommended for shadow capture)</option>
-                          <option value="raw">raw (pass-through, no driver)</option>
-                          @for (d of wizardDrivers; track d.ppd) {
-                            <option [value]="d.ppd">{{ d.description }}</option>
+                          <optgroup label="Recommended for physical printers">
+                            <option value="/usr/share/ppd/cupsfilters/pxlcolor.ppd">Generic PCL-XL Color (works with nearly all laser printers) ★</option>
+                            <option value="/usr/share/ppd/cupsfilters/pxlmono.ppd">Generic PCL-XL Monochrome (for mono laser printers)</option>
+                            <option value="/usr/share/ppd/cupsfilters/Generic-PDF_Printer-PDF.ppd">Generic PDF Printer (for printers that accept PDF natively)</option>
+                          </optgroup>
+                          <optgroup label="Virtual / special">
+                            <option value="/usr/share/ppd/cups-pdf/CUPS-PDF_opt.ppd">CUPS-PDF (saves as PDF file — for shadow/capture)</option>
+                            <option value="raw">raw (pass-through, no processing)</option>
+                          </optgroup>
+                          @if (wizardDrivers.length > 0) {
+                            <optgroup label="All available drivers">
+                              @for (d of wizardDrivers; track d.ppd) {
+                                <option [value]="d.ppd">{{ d.description }}</option>
+                              }
+                            </optgroup>
                           }
                         </select>
+                        <div class="form-text small mt-1">
+                          @if (wizardSelectedPpd.includes('pxlcolor') || wizardSelectedPpd.includes('pxlmono')) {
+                            Converts jobs to PCL — reliable for any standard laser printer.
+                          } @else if (wizardSelectedPpd.includes('Generic-PDF') || wizardSelectedPpd.includes('HP-Color')) {
+                            Sends PDF to printer — only works if the printer supports PDF natively.
+                          } @else if (wizardSelectedPpd.includes('cups-pdf') || wizardSelectedPpd.includes('CUPS-PDF')) {
+                            Saves print jobs as PDF files on the server. Does NOT send to a physical printer.
+                          } @else if (wizardSelectedPpd === 'raw') {
+                            Sends files unchanged. Printer must understand the format (PDF/PS/PCL).
+                          }
+                        </div>
                       }
                     </div>
                     <div class="alert alert-info small mb-0">
@@ -1984,7 +2006,15 @@ export class AdminPanelComponent implements OnInit {
 
   wizardNext() {
     if (this.wizardStep === 'connection') this.wizardStep = 'device';
-    else if (this.wizardStep === 'device') this.wizardStep = 'details';
+    else if (this.wizardStep === 'device') {
+      this.wizardStep = 'details';
+      // Auto-select appropriate PPD based on connection type
+      if (this.wizardConnType === 'pdf') {
+        this.wizardSelectedPpd = '/usr/share/ppd/cups-pdf/CUPS-PDF_opt.ppd';
+      } else {
+        this.wizardSelectedPpd = '/usr/share/ppd/cupsfilters/pxlcolor.ppd';
+      }
+    }
     else if (this.wizardStep === 'details') {
       this.wizardStep = 'driver';
       this.loadDriverStepData();

@@ -1421,16 +1421,37 @@ async def api_admin_list_devices(request):
 
 @routes.get(config.URL_PREFIX + 'api/admin/printers/drivers')
 async def api_admin_list_drivers(request):
-    """`lpinfo -m` — list available PPD/driver identifiers."""
+    """List available PPD/driver options. Tries lpinfo -m; falls back to scanning /usr/share/ppd."""
     _require_admin(request)
-    rc, out, err = _run(['lpinfo', '-m'], timeout=60)
-    drivers = []
-    for line in (out or '').splitlines():
-        parts = line.split(None, 1)
-        if len(parts) == 2:
-            drivers.append({'ppd': parts[0], 'description': parts[1].strip()})
-    return web.json_response({'status': 'ok' if rc == 0 else 'error',
-                              'drivers': drivers, 'stderr': err})
+    drivers: list[dict] = []
+
+    # Try lpinfo -m first
+    rc, out, _ = _run(['lpinfo', '-m'], timeout=60)
+    if rc == 0 and out:
+        for line in out.splitlines():
+            parts = line.split(None, 1)
+            if len(parts) == 2:
+                drivers.append({'ppd': parts[0], 'description': parts[1].strip()})
+
+    # Fallback: scan PPD files directly with human-friendly descriptions
+    if not drivers:
+        import glob
+        _PPD_DESCRIPTIONS = {
+            'pxlmono.ppd': 'Generic PCL-XL Monochrome (works with nearly all mono laser printers)',
+            'pxlcolor.ppd': 'Generic PCL-XL Color (works with nearly all color laser printers)',
+            'Generic-PDF_Printer-PDF.ppd': 'Generic PDF Printer (for printers that accept PDF natively)',
+            'Ricoh-PDF_Printer-PDF.ppd': 'Ricoh PDF Printer',
+            'HP-Color_LaserJet_CM3530_MFP-PDF.ppd': 'HP Color LaserJet CM3530 MFP (PDF)',
+            'Fuji_Xerox-DocuPrint_CM305_df-PDF.ppd': 'Fuji Xerox DocuPrint CM305 df (PDF)',
+            'CUPS-PDF_opt.ppd': 'CUPS-PDF Virtual Printer (saves as PDF file, does NOT print)',
+            'CUPS-PDF_noopt.ppd': 'CUPS-PDF Virtual Printer — no options (saves as PDF file)',
+        }
+        for ppd_path in sorted(glob.glob('/usr/share/ppd/**/*.ppd', recursive=True)):
+            basename = os.path.basename(ppd_path)
+            desc = _PPD_DESCRIPTIONS.get(basename, basename.replace('.ppd', '').replace('-', ' ').replace('_', ' '))
+            drivers.append({'ppd': ppd_path, 'description': desc})
+
+    return web.json_response({'status': 'ok', 'drivers': drivers})
 
 
 @routes.get(config.URL_PREFIX + 'api/admin/printers/{name}/ping')
@@ -1528,7 +1549,9 @@ async def api_admin_create_printer(request):
         return web.json_response({'status': 'error',
                                   'msg': 'Printer name must be alphanumeric (and -, _).'}, status=400)
     cmd = ['lpadmin', '-p', name, '-E', '-D', description, '-L', location, '-v', backend]
-    if ppd and os.path.isfile(ppd):
+    if ppd == 'raw':
+        cmd.extend(['-m', 'raw'])
+    elif ppd and os.path.isfile(ppd):
         cmd.extend(['-P', ppd])
     elif ppd:
         cmd.extend(['-m', ppd])
