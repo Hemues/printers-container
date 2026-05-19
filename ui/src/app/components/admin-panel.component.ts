@@ -2,7 +2,7 @@ import { Component, inject, OnInit, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faTrashCan, faKey, faUserPlus, faLock, faUnlock, faGear, faFloppyDisk, faShieldHalved, faToggleOn, faToggleOff, faEnvelope, faClipboardList, faPrint, faPlus, faChartBar, faArrowLeft, faCircleCheck, faCircleXmark, faPenToSquare, faSearch, faNetworkWired, faPlug, faServer, faGlobe, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faTrashCan, faKey, faUserPlus, faLock, faUnlock, faGear, faFloppyDisk, faShieldHalved, faToggleOn, faToggleOff, faEnvelope, faClipboardList, faPrint, faPlus, faChartBar, faArrowLeft, faCircleCheck, faCircleXmark, faPenToSquare, faSearch, faNetworkWired, faPlug, faServer, faGlobe, faTimes, faDownload, faUpload, faMicrochip } from '@fortawesome/free-solid-svg-icons';
 import { AuthService, UserRecord } from '../services/auth.service';
 
 interface SettingEntry {
@@ -487,7 +487,7 @@ interface SettingEntry {
               <div class="modal-content">
                 <div class="modal-header py-2">
                   <h6 class="modal-title">
-                    <fa-icon [icon]="faPlus" class="me-2" /> Add Printer — Step {{ wizardStep === 'connection' ? '1' : wizardStep === 'device' ? '2' : '3' }} of 3
+                    <fa-icon [icon]="faPlus" class="me-2" /> Add Printer — Step {{ wizardStep === 'connection' ? '1' : wizardStep === 'device' ? '2' : wizardStep === 'details' ? '3' : '4' }} of 4
                   </h6>
                   <button class="btn btn-sm btn-outline-secondary" (click)="showAddPrinterWizard = false" title="Close">
                     <fa-icon [icon]="faTimes" />
@@ -605,13 +605,98 @@ interface SettingEntry {
                     <div class="alert alert-info small mb-0">
                       Final URI: <code>{{ finalWizardUri() }}</code>
                     </div>
+                  } @else if (wizardStep === 'driver') {
+                    <p class="small text-muted mb-2">
+                      <fa-icon [icon]="faMicrochip" class="me-1" /> Windows Driver — required for Windows clients to print via SMB.
+                      @if (wizardDetectedModel) {
+                        <br>Detected model: <strong>{{ wizardDetectedModel }}</strong> ({{ wizardDetectedMfr }})
+                      }
+                    </p>
+                    <div class="list-group mb-2">
+                      <button class="list-group-item list-group-item-action py-1" [class.active]="wizardDriverMode === 'skip'" (click)="wizardDriverMode = 'skip'">
+                        <strong>Skip</strong> — configure driver later (Windows will ask user to select a local driver)
+                      </button>
+                      <button class="list-group-item list-group-item-action py-1" [class.active]="wizardDriverMode === 'find'" (click)="wizardDriverMode = 'find'">
+                        <fa-icon [icon]="faSearch" class="me-1" /> <strong>Find</strong> — auto-discover a driver download URL
+                      </button>
+                      <button class="list-group-item list-group-item-action py-1" [class.active]="wizardDriverMode === 'url'" (click)="wizardDriverMode = 'url'">
+                        <fa-icon [icon]="faDownload" class="me-1" /> <strong>URL</strong> — enter a download URL manually
+                      </button>
+                      <button class="list-group-item list-group-item-action py-1" [class.active]="wizardDriverMode === 'upload'" (click)="wizardDriverMode = 'upload'">
+                        <fa-icon [icon]="faUpload" class="me-1" /> <strong>Upload</strong> — upload a driver file (exe/zip/cab)
+                      </button>
+                      @if (wizardInstalledDrivers.length > 0) {
+                        <button class="list-group-item list-group-item-action py-1" [class.active]="wizardDriverMode === 'installed'" (click)="wizardDriverMode = 'installed'">
+                          <fa-icon [icon]="faMicrochip" class="me-1" /> <strong>Use installed</strong> — pick from already-installed drivers
+                        </button>
+                      }
+                    </div>
+                    @if (wizardDriverMode === 'find') {
+                      <div class="card p-2">
+                        <button class="btn btn-sm btn-primary mb-2" (click)="doFindDriver('wizard')" [disabled]="wizardDriverFinding">
+                          @if (wizardDriverFinding) { <span class="spinner-border spinner-border-sm me-1"></span> Searching… } @else { <fa-icon [icon]="faSearch" class="me-1" /> Find Driver }
+                        </button>
+                        @if (wizardDriverFindResult) {
+                          @if (wizardDriverFindResult.status === 'found') {
+                            <div class="alert alert-success small py-1 mb-0">
+                              <strong>Found!</strong> {{ wizardDriverFindResult.driver_name }}<br>
+                              <code class="small">{{ wizardDriverFindResult.url }}</code> ({{ wizardDriverFindResult.size_mb }} MB)
+                              @if (wizardDriverFindResult.note) { <br><em>{{ wizardDriverFindResult.note }}</em> }
+                            </div>
+                          } @else {
+                            <div class="alert alert-warning small py-1 mb-0">
+                              {{ wizardDriverFindResult.msg }}
+                              @if (wizardDriverFindResult.manual_page) { <br><a [href]="wizardDriverFindResult.manual_page" target="_blank">Manual download page</a> }
+                            </div>
+                          }
+                        }
+                      </div>
+                    } @else if (wizardDriverMode === 'url') {
+                      <div class="card p-2">
+                        <label class="form-label small mb-1">Download URL (exe/zip/cab)</label>
+                        <input type="text" class="form-control form-control-sm" [(ngModel)]="wizardDriverUrl" placeholder="https://...">
+                        <label class="form-label small mb-1 mt-2">Driver name (optional — auto-detected from INF)</label>
+                        <input type="text" class="form-control form-control-sm" [(ngModel)]="wizardDriverName" placeholder="HP Universal Printing PCL 6">
+                      </div>
+                    } @else if (wizardDriverMode === 'upload') {
+                      <div class="card p-2">
+                        <label class="form-label small mb-1">Driver package (exe/zip/cab/7z)</label>
+                        <input type="file" class="form-control form-control-sm" (change)="onDriverFileSelect($event, 'wizard')" accept=".exe,.zip,.cab,.7z">
+                        @if (wizardDriverUploading) {
+                          <div class="mt-2 small"><span class="spinner-border spinner-border-sm me-1"></span> Uploading & extracting…</div>
+                        }
+                        @if (wizardDriverUploadResult) {
+                          <div class="mt-2 alert small py-1 mb-0" [class.alert-success]="!wizardDriverUploadResult.startsWith('Error')" [class.alert-danger]="wizardDriverUploadResult.startsWith('Error')">
+                            {{ wizardDriverUploadResult }}
+                          </div>
+                        }
+                      </div>
+                    } @else if (wizardDriverMode === 'installed') {
+                      <div class="card p-2">
+                        <select class="form-select form-select-sm" [(ngModel)]="wizardSelectedInstalledDriver">
+                          @for (d of wizardInstalledDrivers; track d) {
+                            <option [value]="d">{{ d }}</option>
+                          }
+                        </select>
+                      </div>
+                    }
+                    @if (wizardDriverManufacturers.length > 0) {
+                      <details class="mt-2">
+                        <summary class="small text-muted">Supported manufacturers & drivers</summary>
+                        <div class="small mt-1">
+                          @for (m of wizardDriverManufacturers; track m.manufacturer) {
+                            <div class="mb-1"><strong>{{ m.manufacturer }}</strong>: {{ m.driver_name }} <span class="text-muted">— {{ m.description }}</span></div>
+                          }
+                        </div>
+                      </details>
+                    }
                   }
                 </div>
                 <div class="modal-footer py-1">
                   @if (wizardStep !== 'connection') {
                     <button class="btn btn-sm btn-outline-secondary" (click)="wizardBack()">Back</button>
                   }
-                  @if (wizardStep !== 'details') {
+                  @if (wizardStep !== 'driver') {
                     <button class="btn btn-sm btn-primary" (click)="wizardNext()" [disabled]="!wizardCanAdvance()">Next</button>
                   } @else {
                     <button class="btn btn-sm btn-success" (click)="submitAddPrinter()" [disabled]="!newPrinterName || printersBusy">
@@ -650,6 +735,54 @@ interface SettingEntry {
                     <label class="form-label small mb-0">Location</label>
                     <input type="text" class="form-control" [(ngModel)]="modifyLocation">
                   </div>
+                  <hr class="my-2">
+                  <h6 class="small fw-bold"><fa-icon [icon]="faMicrochip" class="me-1" /> Windows Driver</h6>
+                  <div class="btn-group btn-group-sm mb-2 w-100" role="group">
+                    <button class="btn btn-outline-secondary" [class.active]="modifyDriverMode === 'skip'" (click)="modifyDriverMode = 'skip'">Keep</button>
+                    <button class="btn btn-outline-secondary" [class.active]="modifyDriverMode === 'find'" (click)="modifyDriverMode = 'find'">Find</button>
+                    <button class="btn btn-outline-secondary" [class.active]="modifyDriverMode === 'url'" (click)="modifyDriverMode = 'url'">URL</button>
+                    <button class="btn btn-outline-secondary" [class.active]="modifyDriverMode === 'upload'" (click)="modifyDriverMode = 'upload'">Upload</button>
+                    @if (wizardInstalledDrivers.length > 0) {
+                      <button class="btn btn-outline-secondary" [class.active]="modifyDriverMode === 'installed'" (click)="modifyDriverMode = 'installed'">Installed</button>
+                    }
+                  </div>
+                  @if (modifyDriverMode === 'find') {
+                    <div class="card p-2">
+                      <button class="btn btn-sm btn-primary mb-2" (click)="doFindDriver('modify')" [disabled]="modifyDriverFinding">
+                        @if (modifyDriverFinding) { <span class="spinner-border spinner-border-sm me-1"></span> Searching… } @else { <fa-icon [icon]="faSearch" class="me-1" /> Find Driver }
+                      </button>
+                      @if (modifyDriverFindResult) {
+                        @if (modifyDriverFindResult.status === 'found') {
+                          <div class="alert alert-success small py-1 mb-0">
+                            <strong>Found!</strong> {{ modifyDriverFindResult.driver_name }}<br>
+                            <code class="small">{{ modifyDriverFindResult.url }}</code> ({{ modifyDriverFindResult.size_mb }} MB)
+                          </div>
+                        } @else {
+                          <div class="alert alert-warning small py-1 mb-0">
+                            {{ modifyDriverFindResult.msg }}
+                            @if (modifyDriverFindResult.manual_page) { <br><a [href]="modifyDriverFindResult.manual_page" target="_blank">Manual download</a> }
+                          </div>
+                        }
+                      }
+                    </div>
+                  } @else if (modifyDriverMode === 'url') {
+                    <div>
+                      <input type="text" class="form-control form-control-sm mb-1" [(ngModel)]="modifyDriverUrl" placeholder="https://ftp.hp.com/...">
+                      <input type="text" class="form-control form-control-sm" [(ngModel)]="modifyDriverName" placeholder="Driver name (optional)">
+                    </div>
+                  } @else if (modifyDriverMode === 'upload') {
+                    <div>
+                      <input type="file" class="form-control form-control-sm" (change)="onDriverFileSelect($event, 'modify')" accept=".exe,.zip,.cab,.7z">
+                      @if (modifyDriverUploading) { <div class="mt-1 small"><span class="spinner-border spinner-border-sm me-1"></span> Uploading…</div> }
+                      @if (modifyDriverUploadResult) { <div class="mt-1 alert small py-1 mb-0" [class.alert-success]="!modifyDriverUploadResult.startsWith('Error')" [class.alert-danger]="modifyDriverUploadResult.startsWith('Error')">{{ modifyDriverUploadResult }}</div> }
+                    </div>
+                  } @else if (modifyDriverMode === 'installed') {
+                    <select class="form-select form-select-sm" [(ngModel)]="wizardSelectedInstalledDriver">
+                      @for (d of wizardInstalledDrivers; track d) {
+                        <option [value]="d">{{ d }}</option>
+                      }
+                    </select>
+                  }
                 </div>
                 <div class="modal-footer py-1">
                   <button class="btn btn-sm btn-secondary" (click)="showModifyPrinter = false">Cancel</button>
@@ -1010,6 +1143,9 @@ export class AdminPanelComponent implements OnInit {
   faServer = faServer;
   faGlobe = faGlobe;
   faTimes = faTimes;
+  faDownload = faDownload;
+  faUpload = faUpload;
+  faMicrochip = faMicrochip;
 
   users: UserRecord[] = [];
   filteredUsers: UserRecord[] = [];
@@ -1066,7 +1202,7 @@ export class AdminPanelComponent implements OnInit {
   printersStatusErr = false;
   // Add-printer wizard state
   showAddPrinterWizard = false;
-  wizardStep: 'connection' | 'device' | 'details' = 'connection';
+  wizardStep: 'connection' | 'device' | 'details' | 'driver' = 'connection';
   wizardConnType: 'usb' | 'socket' | 'ipp' | 'ipps' | 'lpd' | 'pdf' | 'manual' = 'pdf';
   wizardDevices: { class: string; uri: string }[] = [];
   wizardDevicesLoading = false;
@@ -1079,12 +1215,32 @@ export class AdminPanelComponent implements OnInit {
   wizardSelectedPpd = '/usr/share/ppd/cups-pdf/CUPS-PDF_opt.ppd';
   wizardDescription = '';
   wizardLocation = '';
+  // Windows driver state (shared between wizard step 4 and modify modal)
+  wizardDriverMode: 'skip' | 'find' | 'url' | 'upload' | 'installed' = 'skip';
+  wizardDriverUrl = '';
+  wizardDriverName = '';
+  wizardDriverFinding = false;
+  wizardDriverFindResult: { status: string; url?: string; size_mb?: number; driver_name?: string; note?: string; msg?: string; manual_page?: string } | null = null;
+  wizardDriverUploading = false;
+  wizardDriverUploadResult = '';
+  wizardDriverManufacturers: { manufacturer: string; driver_name: string; description: string; manual_page?: string }[] = [];
+  wizardInstalledDrivers: string[] = [];
+  wizardSelectedInstalledDriver = '';
+  wizardDetectedModel = '';
+  wizardDetectedMfr = '';
   // Modify state
   showModifyPrinter = false;
   modifyName = '';
   modifyUri = '';
   modifyDescription = '';
   modifyLocation = '';
+  modifyDriverMode: 'skip' | 'find' | 'url' | 'upload' | 'installed' = 'skip';
+  modifyDriverUrl = '';
+  modifyDriverName = '';
+  modifyDriverFinding = false;
+  modifyDriverFindResult: { status: string; url?: string; size_mb?: number; driver_name?: string; note?: string; msg?: string; manual_page?: string } | null = null;
+  modifyDriverUploading = false;
+  modifyDriverUploadResult = '';
 
   // Admin stats state
   showAdminStatsModal = false;
@@ -1673,7 +1829,17 @@ export class AdminPanelComponent implements OnInit {
     this.modifyUri = p.uri;
     this.modifyDescription = '';
     this.modifyLocation = '';
+    this.modifyDriverMode = 'skip';
+    this.modifyDriverUrl = '';
+    this.modifyDriverName = '';
+    this.modifyDriverFindResult = null;
+    this.modifyDriverUploadResult = '';
     this.showModifyPrinter = true;
+    // Load installed drivers for the dropdown
+    this.http.get<{ drivers: string[] }>('api/admin/printers/drivers/installed').subscribe({
+      next: (res) => { this.wizardInstalledDrivers = res.drivers || []; },
+      error: () => {},
+    });
   }
 
   submitModifyPrinter() {
@@ -1684,12 +1850,16 @@ export class AdminPanelComponent implements OnInit {
     if (this.modifyLocation) body.location = this.modifyLocation;
     this.http.put<{ status: string; msg: string }>(`api/admin/printers/${encodeURIComponent(this.modifyName)}`, body).subscribe({
       next: (res) => {
-        this.printersBusy = false;
         if (res.status === 'ok') {
-          this.showModifyPrinter = false;
-          this.showPrintersStatus(res.msg);
-          this.loadPrinters();
+          // Install driver if requested
+          this.installDriverForPrinter(this.modifyName, 'modify', () => {
+            this.printersBusy = false;
+            this.showModifyPrinter = false;
+            this.showPrintersStatus(res.msg);
+            this.loadPrinters();
+          });
         } else {
+          this.printersBusy = false;
           this.showPrintersStatus(res.msg, true);
         }
       },
@@ -1710,6 +1880,15 @@ export class AdminPanelComponent implements OnInit {
     this.wizardLocation = '';
     this.wizardSelectedPpd = '/usr/share/ppd/cups-pdf/CUPS-PDF_opt.ppd';
     this.newPrinterName = '';
+    // Reset driver step state
+    this.wizardDriverMode = 'skip';
+    this.wizardDriverUrl = '';
+    this.wizardDriverName = '';
+    this.wizardDriverFindResult = null;
+    this.wizardDriverUploadResult = '';
+    this.wizardDetectedModel = '';
+    this.wizardDetectedMfr = '';
+    this.wizardSelectedInstalledDriver = '';
     if (this.wizardDrivers.length === 0) {
       this.wizardDriversLoading = true;
       this.http.get<{ drivers: { ppd: string; description: string }[] }>('api/admin/printers/drivers').subscribe({
@@ -1769,17 +1948,108 @@ export class AdminPanelComponent implements OnInit {
         default: return !!this.wizardHost.trim();
       }
     }
+    if (this.wizardStep === 'details') return !!this.newPrinterName;
     return false;
   }
 
   wizardNext() {
     if (this.wizardStep === 'connection') this.wizardStep = 'device';
     else if (this.wizardStep === 'device') this.wizardStep = 'details';
+    else if (this.wizardStep === 'details') {
+      this.wizardStep = 'driver';
+      this.loadDriverStepData();
+    }
   }
 
   wizardBack() {
-    if (this.wizardStep === 'details') this.wizardStep = 'device';
+    if (this.wizardStep === 'driver') this.wizardStep = 'details';
+    else if (this.wizardStep === 'details') this.wizardStep = 'device';
     else if (this.wizardStep === 'device') this.wizardStep = 'connection';
+  }
+
+  loadDriverStepData() {
+    // Load installed drivers
+    this.http.get<{ drivers: string[] }>('api/admin/printers/drivers/installed').subscribe({
+      next: (res) => { this.wizardInstalledDrivers = res.drivers || []; },
+      error: () => {},
+    });
+    // Load manufacturers info
+    if (this.wizardDriverManufacturers.length === 0) {
+      this.http.get<{ manufacturers: any[] }>('api/admin/printers/drivers/manufacturers').subscribe({
+        next: (res) => { this.wizardDriverManufacturers = res.manufacturers || []; },
+        error: () => {},
+      });
+    }
+    // Auto-detect model if we have a network URI
+    const uri = this.finalWizardUri();
+    if (uri && !uri.startsWith('cups-pdf') && !uri.startsWith('(')) {
+      this.http.post<{ model?: string; method?: string; suggested_driver?: any }>('api/admin/printers/detect', { uri }).subscribe({
+        next: (res) => {
+          if (res.model) {
+            this.wizardDetectedModel = res.model;
+            this.wizardDetectedMfr = res.suggested_driver?.manufacturer || '';
+            // Pre-select find mode for supported manufacturers
+            if (res.suggested_driver?.find_supported) {
+              this.wizardDriverMode = 'find';
+            }
+          }
+        },
+        error: () => {},
+      });
+    }
+  }
+
+  doFindDriver(ctx: 'wizard' | 'modify') {
+    if (ctx === 'wizard') {
+      this.wizardDriverFinding = true;
+      this.wizardDriverFindResult = null;
+    } else {
+      this.modifyDriverFinding = true;
+      this.modifyDriverFindResult = null;
+    }
+    this.http.get<any>('api/admin/printers/drivers/find?manufacturer=HP&type=pcl6').subscribe({
+      next: (res) => {
+        if (ctx === 'wizard') { this.wizardDriverFinding = false; this.wizardDriverFindResult = res; }
+        else { this.modifyDriverFinding = false; this.modifyDriverFindResult = res; }
+      },
+      error: () => {
+        const err = { status: 'error', msg: 'Request failed.' };
+        if (ctx === 'wizard') { this.wizardDriverFinding = false; this.wizardDriverFindResult = err; }
+        else { this.modifyDriverFinding = false; this.modifyDriverFindResult = err; }
+      },
+    });
+  }
+
+  onDriverFileSelect(event: Event, ctx: 'wizard' | 'modify') {
+    const input = event.target as HTMLInputElement;
+    if (!input.files?.length) return;
+    const file = input.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+    if (ctx === 'wizard') {
+      this.wizardDriverUploading = true;
+      this.wizardDriverUploadResult = '';
+    } else {
+      this.modifyDriverUploading = true;
+      this.modifyDriverUploadResult = '';
+    }
+    this.http.post<any>('api/admin/printers/drivers/upload', formData).subscribe({
+      next: (res) => {
+        const msg = res.status === 'ok' ? res.msg : `Error: ${res.msg}`;
+        if (ctx === 'wizard') { this.wizardDriverUploading = false; this.wizardDriverUploadResult = msg; }
+        else { this.modifyDriverUploading = false; this.modifyDriverUploadResult = msg; }
+        // Refresh installed drivers
+        this.http.get<{ drivers: string[] }>('api/admin/printers/drivers/installed').subscribe({
+          next: (r) => { this.wizardInstalledDrivers = r.drivers || []; },
+          error: () => {},
+        });
+      },
+      error: (err: any) => {
+        const msg = `Error: ${err?.error?.msg || 'Upload failed.'}`;
+        if (ctx === 'wizard') { this.wizardDriverUploading = false; this.wizardDriverUploadResult = msg; }
+        else { this.modifyDriverUploading = false; this.modifyDriverUploadResult = msg; }
+      },
+    });
   }
 
   submitAddPrinter() {
@@ -1797,16 +2067,66 @@ export class AdminPanelComponent implements OnInit {
       ppd: this.wizardSelectedPpd,
     }).subscribe({
       next: (res) => {
-        this.printersBusy = false;
         if (res.status === 'ok') {
-          this.showAddPrinterWizard = false;
-          this.showPrintersStatus('Printer added.');
-          this.loadPrinters();
+          // Now install driver if requested
+          this.installDriverForPrinter(this.newPrinterName, 'wizard', () => {
+            this.printersBusy = false;
+            this.showAddPrinterWizard = false;
+            this.showPrintersStatus('Printer added.');
+            this.loadPrinters();
+          });
         } else {
+          this.printersBusy = false;
           this.showPrintersStatus(res.msg, true);
         }
       },
       error: (err: any) => { this.printersBusy = false; this.showPrintersStatus(err?.error?.msg || 'Error.', true); },
+    });
+  }
+
+  /** Install the Windows driver for a printer based on wizard/modify mode state. */
+  installDriverForPrinter(printerName: string, ctx: 'wizard' | 'modify', onDone: () => void) {
+    const mode = ctx === 'wizard' ? this.wizardDriverMode : this.modifyDriverMode;
+    if (mode === 'skip') { onDone(); return; }
+
+    let body: any = {};
+    if (mode === 'find') {
+      const result = ctx === 'wizard' ? this.wizardDriverFindResult : this.modifyDriverFindResult;
+      if (result?.url) {
+        body = { url: result.url, driver_name: result.driver_name || '' };
+      } else {
+        onDone(); return;  // Find didn't produce a URL
+      }
+    } else if (mode === 'url') {
+      const drvUrl = ctx === 'wizard' ? this.wizardDriverUrl : this.modifyDriverUrl;
+      const drvName = ctx === 'wizard' ? this.wizardDriverName : this.modifyDriverName;
+      if (!drvUrl.trim()) { onDone(); return; }
+      body = { url: drvUrl.trim(), driver_name: drvName.trim() };
+    } else if (mode === 'installed') {
+      body = { driver_name: this.wizardSelectedInstalledDriver };
+    } else if (mode === 'upload') {
+      // Upload already registered the driver, just associate it
+      const installed = this.wizardInstalledDrivers;
+      if (installed.length > 0) {
+        body = { driver_name: installed[installed.length - 1] };
+      } else {
+        onDone(); return;
+      }
+    }
+
+    this.http.post<any>(`api/admin/printers/${encodeURIComponent(printerName)}/install-driver`, body).subscribe({
+      next: (res) => {
+        if (res.status === 'ok') {
+          this.showPrintersStatus(`Driver installed: ${res.driver_name || 'ok'}`);
+        } else {
+          this.showPrintersStatus(`Printer created but driver failed: ${res.msg}`, true);
+        }
+        onDone();
+      },
+      error: (err: any) => {
+        this.showPrintersStatus(`Printer created but driver error: ${err?.error?.msg || 'failed'}`, true);
+        onDone();
+      },
     });
   }
 

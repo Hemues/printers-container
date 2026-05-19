@@ -46,8 +46,86 @@ _HP_UPD_SOFTPAQS = [
 HP_UPD_PCL6_DRIVER_NAME = 'HP Universal Printing PCL 6'
 HP_UPD_PS_DRIVER_NAME = 'HP Universal Printing PS'
 
-# Model-to-driver mapping
-_HP_MODELS = re.compile(r'\bhp\b|\blaserjet\b|\bofficejet\b|\bdeskjet\b|\bcolor\s*laser', re.IGNORECASE)
+# Model-to-driver/manufacturer mapping patterns
+_HP_MODELS = re.compile(r'\bhp\b|\blaserjet\b|\bofficejet\b|\bdeskjet\b|\bcolor\s*laser|\bpagewide\b', re.IGNORECASE)
+_CANON_MODELS = re.compile(r'\bcanon\b|\bimageCLASS\b|\bimageRUNNER\b|\bSATERA\b|\bLBP\b|\bMF\d', re.IGNORECASE)
+_BROTHER_MODELS = re.compile(r'\bbrother\b|\bHL-\b|\bMFC-\b|\bDCP-\b', re.IGNORECASE)
+_EPSON_MODELS = re.compile(r'\bepson\b|\bWorkForce\b|\bEcoTank\b|\bExpression\b', re.IGNORECASE)
+_RICOH_MODELS = re.compile(r'\bricoh\b|\baficio\b|\bMP\s*\d|\bSP\s*\d|\bIM\s*\d', re.IGNORECASE)
+_XEROX_MODELS = re.compile(r'\bxerox\b|\bphaser\b|\bversalink\b|\bworkcentre\b|\balta\s*link\b', re.IGNORECASE)
+_KONICA_MODELS = re.compile(r'\bkonica\b|\bminolta\b|\bbizhub\b', re.IGNORECASE)
+_KYOCERA_MODELS = re.compile(r'\bkyocera\b|\btaskalfa\b|\becosys\b', re.IGNORECASE)
+_SAMSUNG_MODELS = re.compile(r'\bsamsung\b|\bxpress\b|\bSL-\b', re.IGNORECASE)
+_LEXMARK_MODELS = re.compile(r'\blexmark\b|\bMS\d|\bMX\d|\bCX\d', re.IGNORECASE)
+
+# Known universal/generic driver info for each manufacturer
+_DRIVER_DB = {
+    'HP': {
+        'driver_name': HP_UPD_PCL6_DRIVER_NAME,
+        'driver_type': 'PCL 6',
+        'description': 'HP Universal Print Driver PCL 6 (x64) — works with all HP LaserJet/OfficeJet/MFP printers',
+    },
+    'Canon': {
+        'driver_name': 'Canon Generic Plus UFR II',
+        'driver_type': 'UFR II',
+        'description': 'Canon Generic Plus UFR II Driver — works with most Canon LBP/imageRUNNER/MF series',
+        'manual_page': 'https://www.canon.com/support/software-drivers',
+    },
+    'Brother': {
+        'driver_name': 'Brother Universal Printer',
+        'driver_type': 'PCL',
+        'description': 'Brother Universal Printer Driver (PCL) — works with Brother HL/MFC/DCP series',
+        'manual_page': 'https://support.brother.com/g/s/id/os/linux/packages/unipdrv_en.html',
+    },
+    'Epson': {
+        'driver_name': 'EPSON Universal Print Driver',
+        'driver_type': 'ESC/P-R',
+        'description': 'Epson Universal Print Driver — works with Epson WorkForce/EcoTank series',
+        'manual_page': 'https://download.ebz.epson.net/dsc/search/01/search/',
+    },
+    'Ricoh': {
+        'driver_name': 'RICOH PCL6 UniversalDriver V4.0',
+        'driver_type': 'PCL 6',
+        'description': 'Ricoh Universal PCL6 Driver — works with Ricoh/Aficio/MP/SP/IM series',
+        'manual_page': 'https://www.ricoh.com/support/download',
+    },
+    'Xerox': {
+        'driver_name': 'Xerox Global Print Driver PCL6',
+        'driver_type': 'PCL 6',
+        'description': 'Xerox Global Print Driver PCL6 — works with Xerox Phaser/VersaLink/WorkCentre/AltaLink',
+        'manual_page': 'https://www.support.xerox.com/en-us/product/global-printer-driver/downloads',
+    },
+    'Konica Minolta': {
+        'driver_name': 'KONICA MINOLTA Universal PCL',
+        'driver_type': 'PCL',
+        'description': 'Konica Minolta Universal PCL Driver — works with bizhub series',
+        'manual_page': 'https://www.konicaminolta.com/global-en/support/download/',
+    },
+    'Kyocera': {
+        'driver_name': 'Kyocera Classic Universaldriver PCL6',
+        'driver_type': 'PCL 6',
+        'description': 'Kyocera Universal PCL6 Driver — works with TASKalfa/ECOSYS series',
+        'manual_page': 'https://www.kyoceradocumentsolutions.com/download/',
+    },
+    'Samsung': {
+        'driver_name': 'Samsung Universal Print Driver 3',
+        'driver_type': 'PCL 6',
+        'description': 'Samsung Universal Print Driver — works with Samsung/Xpress printers (now HP)',
+        'manual_page': 'https://www.hp.com/support/samsungprinters',
+    },
+    'Lexmark': {
+        'driver_name': 'Lexmark Universal v2 PCL XL Emul',
+        'driver_type': 'PCL XL',
+        'description': 'Lexmark Universal v2 Driver — works with Lexmark MS/MX/CX series',
+        'manual_page': 'https://www.lexmark.com/en_us/solutions/print-drivers/universal-print-driver.html',
+    },
+    'Generic': {
+        'driver_name': 'Generic / Text Only',
+        'driver_type': 'Generic',
+        'description': 'Windows built-in generic text driver — basic printing only, no advanced features',
+        'manual_page': '',
+    },
+}
 
 
 def ensure_dirs():
@@ -424,24 +502,46 @@ def set_printer_driver(printer_name: str, driver_name: str) -> tuple[bool, str]:
     return True, 'ok'
 
 
+def detect_manufacturer(model: str) -> str:
+    """Detect the printer manufacturer from model string."""
+    checks = [
+        (_HP_MODELS, 'HP'), (_CANON_MODELS, 'Canon'), (_BROTHER_MODELS, 'Brother'),
+        (_EPSON_MODELS, 'Epson'), (_RICOH_MODELS, 'Ricoh'), (_XEROX_MODELS, 'Xerox'),
+        (_KONICA_MODELS, 'Konica Minolta'), (_KYOCERA_MODELS, 'Kyocera'),
+        (_SAMSUNG_MODELS, 'Samsung'), (_LEXMARK_MODELS, 'Lexmark'),
+    ]
+    for pattern, mfr in checks:
+        if pattern.search(model):
+            return mfr
+    return 'Unknown'
+
+
+def get_supported_manufacturers() -> list[dict]:
+    """Return list of all supported manufacturers and their driver info."""
+    return [{'manufacturer': k, **v} for k, v in _DRIVER_DB.items()]
+
+
 def suggest_driver_for_model(model: str) -> dict:
     """Suggest a Windows driver package based on detected printer model."""
-    if _HP_MODELS.search(model):
-        return {
-            'manufacturer': 'HP',
-            'driver_name': HP_UPD_PCL6_DRIVER_NAME,
-            'driver_type': 'PCL 6',
-            'url': HP_UPD_PCL6_URL,
-            'find_url_hint': 'Use GET /api/admin/printers/drivers/find to locate a working download URL',
-            'description': 'HP Universal Print Driver PCL 6 (x64) — works with all HP printers',
-        }
+    mfr = detect_manufacturer(model)
+    if mfr != 'Unknown' and mfr in _DRIVER_DB:
+        info = _DRIVER_DB[mfr].copy()
+        info['manufacturer'] = mfr
+        if mfr == 'HP':
+            info['url'] = HP_UPD_PCL6_URL
+            info['find_supported'] = True
+        else:
+            info['url'] = ''
+            info['find_supported'] = False
+        info['find_url_hint'] = 'Use GET /api/admin/printers/drivers/find to locate a working download URL'
+        return info
 
-    # Add more manufacturers here as needed
     return {
         'manufacturer': 'Unknown',
         'driver_name': '',
         'url': '',
-        'description': 'No automatic driver available for this model. Use "Generic / Text Only" on Windows.',
+        'find_supported': False,
+        'description': 'No automatic driver available. Upload a driver package or use "Generic / Text Only".',
     }
 
 

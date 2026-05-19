@@ -1320,6 +1320,83 @@ async def api_admin_find_driver(request):
     return web.json_response(result)
 
 
+@routes.get(config.URL_PREFIX + 'api/admin/printers/drivers/manufacturers')
+async def api_admin_driver_manufacturers(request):
+    """List supported manufacturers and their universal driver info."""
+    _require_admin(request)
+    mfrs = driver_manager.get_supported_manufacturers()
+    return web.json_response({'status': 'ok', 'manufacturers': mfrs})
+
+
+@routes.post(config.URL_PREFIX + 'api/admin/printers/drivers/upload')
+async def api_admin_upload_driver(request):
+    """Upload a driver archive (exe/zip/cab) for extraction and registration.
+
+    Multipart form: field 'file' with the driver archive,
+    optional 'driver_name' to override the detected name.
+    """
+    _require_admin(request)
+    reader = await request.multipart()
+    driver_name_override = ''
+    archive_path = ''
+
+    async for part in reader:
+        if part.name == 'driver_name':
+            driver_name_override = (await part.text()).strip()
+        elif part.name == 'file':
+            filename = part.filename or 'driver_upload.exe'
+            # Sanitize filename
+            safe_name = ''.join(c for c in filename if c.isalnum() or c in '.-_')[:100]
+            if not safe_name:
+                safe_name = 'driver_upload.exe'
+            driver_manager.ensure_dirs()
+            archive_path = os.path.join(driver_manager.DRIVERS_CACHE, safe_name)
+            with open(archive_path, 'wb') as f:
+                while True:
+                    chunk = await part.read_chunk(65536)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+
+    if not archive_path or not os.path.isfile(archive_path):
+        return web.json_response({'status': 'error', 'msg': 'No file uploaded'}, status=400)
+
+    file_size = os.path.getsize(archive_path)
+    if file_size < 10000:
+        os.unlink(archive_path)
+        return web.json_response({'status': 'error', 'msg': 'File too small to be a driver archive'}, status=400)
+
+    # Extract and find driver files
+    import tempfile
+    extract_dir = tempfile.mkdtemp(prefix='drv_upload_', dir=driver_manager.DRIVERS_CACHE)
+    try:
+        if not driver_manager.extract_driver_archive(archive_path, extract_dir):
+            return web.json_response({'status': 'error', 'msg': 'Failed to extract archive. Supported formats: exe, zip, cab, 7z.'}, status=400)
+
+        drv_info = driver_manager._find_driver_files(extract_dir, 'x64')
+        if not drv_info.get('files'):
+            return web.json_response({'status': 'error', 'msg': 'No printer driver files found in the archive.'}, status=400)
+
+        drv_name = driver_name_override or drv_info.get('driver_name', '')
+        if not drv_name:
+            return web.json_response({'status': 'error',
+                                      'msg': 'Could not auto-detect driver name from INF. Please specify driver_name.'}, status=400)
+
+        # Copy to print$ and register
+        copied = driver_manager.copy_driver_files(drv_info['files'], 'x64')
+        ok, msg = driver_manager.register_driver_samba(drv_name, drv_info['inf'], 'x64')
+        if not ok:
+            return web.json_response({'status': 'partial', 'msg': f'Files copied but registration failed: {msg}',
+                                      'driver_name': drv_name, 'files_copied': len(copied)})
+
+        driver_manager._mark_driver_installed(drv_name)
+        return web.json_response({'status': 'ok', 'driver_name': drv_name, 'files_copied': len(copied),
+                                  'msg': f'Driver "{drv_name}" installed ({len(copied)} files)'})
+    finally:
+        import shutil
+        shutil.rmtree(extract_dir, ignore_errors=True)
+
+
 @routes.get(config.URL_PREFIX + 'api/admin/printers')
 async def api_admin_list_printers(request):
     _require_admin(request)
