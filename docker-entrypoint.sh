@@ -80,6 +80,13 @@ ln -sfn "$CONFIG_DIR/samba/smb.conf" /etc/samba/smb.conf
 chmod 0755 "$CONFIG_DIR/samba/state" "$CONFIG_DIR/samba/cache"
 
 # ---------------------------------------------------------------------------
+# Generate client setup files (registry + PowerShell installers).
+# Regenerated on every start so IP changes are picked up.
+# ---------------------------------------------------------------------------
+echo "[entrypoint] generating client setup files …"
+/app/generate-client-setup.sh
+
+# ---------------------------------------------------------------------------
 # Persist printer drivers (print$ share) on the volume.
 # Windows driver files served to clients survive container updates.
 # ---------------------------------------------------------------------------

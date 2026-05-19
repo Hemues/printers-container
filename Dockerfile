@@ -30,12 +30,12 @@ FROM debian:stable-slim
 
 WORKDIR /app
 
-COPY pyproject.toml docker-entrypoint.sh cups-pdf-postprocess.sh ./
+COPY pyproject.toml docker-entrypoint.sh cups-pdf-postprocess.sh generate-client-setup.sh ./
 
 # Use sed to strip carriage-return characters from the entrypoint script (in case building on Windows)
 # Install dependencies
-RUN sed -i 's/\r$//g' docker-entrypoint.sh && \
-    chmod +x docker-entrypoint.sh && \
+RUN sed -i 's/\r$//g' docker-entrypoint.sh generate-client-setup.sh && \
+    chmod +x docker-entrypoint.sh generate-client-setup.sh && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
       python3 \
@@ -60,6 +60,7 @@ RUN sed -i 's/\r$//g' docker-entrypoint.sh && \
       libpam-winbind \
       acl \
       p7zip-full \
+      iproute2 \
       coreutils && \
     python3 -m venv /opt/venv && \
     /opt/venv/bin/pip install --no-cache-dir aiohttp 'python-socketio>=5.0,<6.0' pyotp 'qrcode[pil]' && \
@@ -89,6 +90,8 @@ ENV LOG_DIR=/logs
 ENV CUPS_PDF_SPOOL=/var/spool/cups-pdf
 # Backend HTTP port (overridable via env)
 ENV PORT=8082
+# Server addresses for client setup files (comma/semicolon separated, auto-detect if empty)
+ENV SERVER_ADDRESSES=
 
 VOLUME /printings
 VOLUME /configs

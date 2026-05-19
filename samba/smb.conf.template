@@ -48,4 +48,18 @@
    read only = yes
    guest ok = no
 
+[registry-install]
+   comment = Printer setup - Registry file (double-click to apply)
+   path = /configs/client-setup/registry-install
+   browseable = yes
+   read only = yes
+   guest ok = no
+
+[powershell-install]
+   comment = Printer setup - PowerShell script (run as Admin)
+   path = /configs/client-setup/powershell-install
+   browseable = yes
+   read only = yes
+   guest ok = no
+
 # --- PRINTER SHARES (managed by backend — do not edit below this line) ---
