@@ -2,7 +2,7 @@ import { Component, inject, OnInit, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faTrashCan, faKey, faUserPlus, faLock, faUnlock, faGear, faFloppyDisk, faShieldHalved, faToggleOn, faToggleOff, faEnvelope, faClipboardList, faPrint, faPlus, faChartBar, faArrowLeft, faCircleCheck, faCircleXmark, faPenToSquare, faSearch, faNetworkWired, faPlug, faServer, faGlobe, faTimes, faDownload, faUpload, faMicrochip } from '@fortawesome/free-solid-svg-icons';
+import { faTrashCan, faKey, faUserPlus, faLock, faUnlock, faGear, faFloppyDisk, faShieldHalved, faToggleOn, faToggleOff, faEnvelope, faClipboardList, faPrint, faPlus, faChartBar, faArrowLeft, faCircleCheck, faCircleXmark, faPenToSquare, faSearch, faNetworkWired, faPlug, faServer, faGlobe, faTimes, faDownload, faUpload, faMicrochip, faCheck } from '@fortawesome/free-solid-svg-icons';
 import { AuthService, UserRecord } from '../services/auth.service';
 
 interface SettingEntry {
@@ -638,10 +638,19 @@ interface SettingEntry {
                         </button>
                         @if (wizardDriverFindResult) {
                           @if (wizardDriverFindResult.status === 'found') {
-                            <div class="alert alert-success small py-1 mb-0">
-                              <strong>Found!</strong> {{ wizardDriverFindResult.driver_name }}<br>
-                              <code class="small">{{ wizardDriverFindResult.url }}</code> ({{ wizardDriverFindResult.size_mb }} MB)
-                              @if (wizardDriverFindResult.note) { <br><em>{{ wizardDriverFindResult.note }}</em> }
+                            <div class="alert alert-success small py-1 mb-0 d-flex justify-content-between align-items-start">
+                              <div>
+                                <strong>Found!</strong> {{ wizardDriverFindResult.driver_name }}<br>
+                                <code class="small">{{ wizardDriverFindResult.url }}</code> ({{ wizardDriverFindResult.size_mb }} MB)
+                                @if (wizardDriverFindResult.note) { <br><em>{{ wizardDriverFindResult.note }}</em> }
+                              </div>
+                              @if (!wizardDriverAccepted) {
+                                <button class="btn btn-sm btn-success ms-2 text-nowrap" (click)="wizardDriverAccepted = true">
+                                  <fa-icon [icon]="faPlus" class="me-1" />Use this
+                                </button>
+                              } @else {
+                                <span class="badge bg-success ms-2 text-nowrap align-self-center"><fa-icon [icon]="faCheck" class="me-1" />Selected</span>
+                              }
                             </div>
                           } @else {
                             <div class="alert alert-warning small py-1 mb-0">
@@ -700,7 +709,7 @@ interface SettingEntry {
                     <button class="btn btn-sm btn-primary" (click)="wizardNext()" [disabled]="!wizardCanAdvance()">Next</button>
                   } @else {
                     <button class="btn btn-sm btn-success" (click)="submitAddPrinter()" [disabled]="!newPrinterName || printersBusy">
-                      <fa-icon [icon]="faPlus" class="me-1" /> Create
+                      <fa-icon [icon]="faPlus" class="me-1" />@if (wizardDriverMode !== 'skip' && wizardDriverMode !== 'find' || wizardDriverAccepted) { Create & Install Driver } @else { Create }
                     </button>
                   }
                 </div>
@@ -753,10 +762,24 @@ interface SettingEntry {
                       </button>
                       @if (modifyDriverFindResult) {
                         @if (modifyDriverFindResult.status === 'found') {
-                          <div class="alert alert-success small py-1 mb-0">
-                            <strong>Found!</strong> {{ modifyDriverFindResult.driver_name }}<br>
-                            <code class="small">{{ modifyDriverFindResult.url }}</code> ({{ modifyDriverFindResult.size_mb }} MB)
+                          <div class="alert alert-success small py-1 mb-0 d-flex justify-content-between align-items-start">
+                            <div>
+                              <strong>Found!</strong> {{ modifyDriverFindResult.driver_name }}<br>
+                              <code class="small">{{ modifyDriverFindResult.url }}</code> ({{ modifyDriverFindResult.size_mb }} MB)
+                            </div>
+                            @if (!modifyDriverInstalling) {
+                              <button class="btn btn-sm btn-success ms-2 text-nowrap" (click)="doInstallFoundDriver('modify')" [disabled]="modifyDriverInstalling">
+                                <fa-icon [icon]="faDownload" class="me-1" />Install now
+                              </button>
+                            } @else {
+                              <span class="ms-2 text-nowrap align-self-center"><span class="spinner-border spinner-border-sm me-1"></span>Installing…</span>
+                            }
                           </div>
+                          @if (modifyDriverInstallResult) {
+                            <div class="mt-1 small" [class.text-success]="!modifyDriverInstallResult.startsWith('Error')" [class.text-danger]="modifyDriverInstallResult.startsWith('Error')">
+                              {{ modifyDriverInstallResult }}
+                            </div>
+                          }
                         } @else {
                           <div class="alert alert-warning small py-1 mb-0">
                             {{ modifyDriverFindResult.msg }}
@@ -1146,6 +1169,7 @@ export class AdminPanelComponent implements OnInit {
   faDownload = faDownload;
   faUpload = faUpload;
   faMicrochip = faMicrochip;
+  faCheck = faCheck;
 
   users: UserRecord[] = [];
   filteredUsers: UserRecord[] = [];
@@ -1228,6 +1252,7 @@ export class AdminPanelComponent implements OnInit {
   wizardSelectedInstalledDriver = '';
   wizardDetectedModel = '';
   wizardDetectedMfr = '';
+  wizardDriverAccepted = false;
   // Modify state
   showModifyPrinter = false;
   modifyName = '';
@@ -1241,6 +1266,8 @@ export class AdminPanelComponent implements OnInit {
   modifyDriverFindResult: { status: string; url?: string; size_mb?: number; driver_name?: string; note?: string; msg?: string; manual_page?: string } | null = null;
   modifyDriverUploading = false;
   modifyDriverUploadResult = '';
+  modifyDriverInstalling = false;
+  modifyDriverInstallResult = '';
 
   // Admin stats state
   showAdminStatsModal = false;
@@ -1834,6 +1861,8 @@ export class AdminPanelComponent implements OnInit {
     this.modifyDriverName = '';
     this.modifyDriverFindResult = null;
     this.modifyDriverUploadResult = '';
+    this.modifyDriverInstalling = false;
+    this.modifyDriverInstallResult = '';
     this.showModifyPrinter = true;
     // Load installed drivers for the dropdown
     this.http.get<{ drivers: string[] }>('api/admin/printers/drivers/installed').subscribe({
@@ -1889,6 +1918,7 @@ export class AdminPanelComponent implements OnInit {
     this.wizardDetectedModel = '';
     this.wizardDetectedMfr = '';
     this.wizardSelectedInstalledDriver = '';
+    this.wizardDriverAccepted = false;
     if (this.wizardDrivers.length === 0) {
       this.wizardDriversLoading = true;
       this.http.get<{ drivers: { ppd: string; description: string }[] }>('api/admin/printers/drivers').subscribe({
@@ -2003,9 +2033,11 @@ export class AdminPanelComponent implements OnInit {
     if (ctx === 'wizard') {
       this.wizardDriverFinding = true;
       this.wizardDriverFindResult = null;
+      this.wizardDriverAccepted = false;
     } else {
       this.modifyDriverFinding = true;
       this.modifyDriverFindResult = null;
+      this.modifyDriverInstallResult = '';
     }
     this.http.get<any>('api/admin/printers/drivers/find?manufacturer=HP&type=pcl6').subscribe({
       next: (res) => {
@@ -2126,6 +2158,29 @@ export class AdminPanelComponent implements OnInit {
       error: (err: any) => {
         this.showPrintersStatus(`Printer created but driver error: ${err?.error?.msg || 'failed'}`, true);
         onDone();
+      },
+    });
+  }
+
+  /** Install found driver directly (for modify modal) */
+  doInstallFoundDriver(ctx: 'modify') {
+    const result = this.modifyDriverFindResult;
+    if (!result?.url) return;
+    this.modifyDriverInstalling = true;
+    this.modifyDriverInstallResult = '';
+    const body = { url: result.url, driver_name: result.driver_name || '' };
+    this.http.post<any>(`api/admin/printers/${encodeURIComponent(this.modifyName)}/install-driver`, body).subscribe({
+      next: (res) => {
+        this.modifyDriverInstalling = false;
+        if (res.status === 'ok') {
+          this.modifyDriverInstallResult = `Installed: ${res.driver_name || 'ok'}`;
+        } else {
+          this.modifyDriverInstallResult = `Error: ${res.msg}`;
+        }
+      },
+      error: (err: any) => {
+        this.modifyDriverInstalling = false;
+        this.modifyDriverInstallResult = `Error: ${err?.error?.msg || 'failed'}`;
       },
     });
   }
