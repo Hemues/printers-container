@@ -31,7 +31,7 @@
    load printers = no
    printing = cups
    printcap name = cups
-   cups server = localhost:631
+   cups server = localhost
    disable spoolss = no
    host msdfs = no
    log file = /logs/samba/log.%m
