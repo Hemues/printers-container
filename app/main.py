@@ -853,7 +853,6 @@ def _smb_printer_block(name: str, comment: str = '') -> str:
         f'   guest ok = no\n'
         f'   read only = yes\n'
         f'   create mask = 0700\n'
-        f'   use client driver = yes\n'
         f'   force user = root\n'
     )
 
