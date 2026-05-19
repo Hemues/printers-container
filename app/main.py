@@ -1002,6 +1002,266 @@ def _printer_uri_reachable(uri: str, timeout: float = 2.0) -> dict:
     return {'reachable': False, 'msg': 'unknown scheme'}
 
 
+# ---------------------------------------------------------------------------
+# Printer model detection (PJL / SNMP / IPP)
+# ---------------------------------------------------------------------------
+def _detect_pjl(host: str, port: int = 9100, timeout: float = 3.0) -> str:
+    """Query printer model via PJL INFO ID over JetDirect."""
+    import socket
+    try:
+        with socket.create_connection((host, port), timeout=timeout) as s:
+            s.settimeout(timeout)
+            # PJL Universal Exit + INFO ID
+            s.sendall(b'\x1b%-12345X@PJL INFO ID\r\n\x1b%-12345X')
+            data = b''
+            while True:
+                try:
+                    chunk = s.recv(1024)
+                    if not chunk:
+                        break
+                    data += chunk
+                    if b'\x0c' in data or b'\x1b' in data[1:] or len(data) > 4096:
+                        break
+                except socket.timeout:
+                    break
+            # Parse response — typically: @PJL INFO ID\r\n"HP LaserJet ..."\r\n
+            text = data.decode('utf-8', errors='replace')
+            for line in text.splitlines():
+                line = line.strip().strip('"').strip()
+                if line and not line.startswith('@PJL') and not line.startswith('\x1b'):
+                    return line
+    except (socket.gaierror, socket.timeout, OSError):
+        pass
+    return ''
+
+
+def _detect_snmp(host: str, community: str = 'public', timeout: float = 2.0) -> str:
+    """Query printer model via SNMPv1 GET (sysDescr.0 and hrDeviceDescr.1)."""
+    import socket
+    import struct
+
+    def _encode_oid(oid_str: str) -> bytes:
+        parts = [int(x) for x in oid_str.split('.')]
+        result = bytes([parts[0] * 40 + parts[1]])
+        for p in parts[2:]:
+            if p < 128:
+                result += bytes([p])
+            else:
+                # Multi-byte encoding
+                enc = []
+                while p > 0:
+                    enc.append(p & 0x7f)
+                    p >>= 7
+                enc.reverse()
+                for i, b in enumerate(enc):
+                    result += bytes([b | 0x80] if i < len(enc) - 1 else [b])
+        return result
+
+    def _build_snmp_get(oid_str: str, comm: str) -> bytes:
+        oid_bytes = _encode_oid(oid_str)
+        # NULL value
+        varbind = bytes([0x06, len(oid_bytes)]) + oid_bytes + b'\x05\x00'
+        varbind_seq = bytes([0x30, len(varbind)]) + varbind
+        varbind_list = bytes([0x30, len(varbind_seq)]) + varbind_seq
+        # GetRequest PDU (0xA0), request-id=1, error=0, error-index=0
+        request_id = b'\x02\x01\x01'
+        error = b'\x02\x01\x00'
+        error_idx = b'\x02\x01\x00'
+        pdu_content = request_id + error + error_idx + varbind_list
+        pdu = bytes([0xA0, len(pdu_content)]) + pdu_content
+        # SNMP message: version=0 (SNMPv1), community, PDU
+        version = b'\x02\x01\x00'
+        comm_bytes = comm.encode()
+        community_field = bytes([0x04, len(comm_bytes)]) + comm_bytes
+        msg_content = version + community_field + pdu
+        return bytes([0x30, len(msg_content)]) + msg_content
+
+    def _parse_snmp_response(data: bytes) -> str:
+        # Simplified: find the OctetString value in the response
+        # Look for 0x04 (OctetString) followed by length and value
+        i = 0
+        last_str = ''
+        while i < len(data) - 2:
+            if data[i] == 0x04:  # OctetString
+                length = data[i + 1]
+                if length < 128 and i + 2 + length <= len(data):
+                    val = data[i + 2:i + 2 + length].decode('utf-8', errors='replace').strip()
+                    if len(val) > 3 and val != community:
+                        last_str = val
+                i += 1
+            else:
+                i += 1
+        return last_str
+
+    # Try sysDescr.0 (1.3.6.1.2.1.1.1.0) and hrDeviceDescr.1 (1.3.6.1.2.1.25.3.2.1.3.1)
+    for oid in ('1.3.6.1.2.1.1.1.0', '1.3.6.1.2.1.25.3.2.1.3.1'):
+        try:
+            pkt = _build_snmp_get(oid, community)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.settimeout(timeout)
+            sock.sendto(pkt, (host, 161))
+            data, _ = sock.recvfrom(4096)
+            sock.close()
+            result = _parse_snmp_response(data)
+            if result:
+                return result
+        except (socket.gaierror, socket.timeout, OSError):
+            continue
+    return ''
+
+
+def _detect_ipp(host: str, port: int = 631, timeout: float = 3.0) -> str:
+    """Query printer model via IPP Get-Printer-Attributes."""
+    import socket
+    import struct
+
+    # Minimal IPP Get-Printer-Attributes request
+    # IPP version 1.1, operation Get-Printer-Attributes (0x000B)
+    uri = f'ipp://{host}:{port}/ipp/print'
+    uri_bytes = uri.encode()
+
+    # Build IPP payload
+    ipp = b''
+    ipp += struct.pack('>BBH', 1, 1, 0x000B)  # version 1.1, op=Get-Printer-Attributes
+    ipp += struct.pack('>I', 1)  # request-id = 1
+    # Operation attributes group (0x01)
+    ipp += b'\x01'
+    # attributes-charset = utf-8
+    ipp += struct.pack('>BH', 0x47, 18) + b'attributes-charset' + struct.pack('>H', 5) + b'utf-8'
+    # attributes-natural-language = en
+    ipp += struct.pack('>BH', 0x48, 27) + b'attributes-natural-language' + struct.pack('>H', 2) + b'en'
+    # printer-uri
+    ipp += struct.pack('>BH', 0x45, 11) + b'printer-uri' + struct.pack('>H', len(uri_bytes)) + uri_bytes
+    # requested-attributes = printer-make-and-model
+    attr = b'printer-make-and-model'
+    ipp += struct.pack('>BH', 0x44, 20) + b'requested-attributes' + struct.pack('>H', len(attr)) + attr
+    # End of attributes
+    ipp += b'\x03'
+
+    # HTTP POST
+    http = (
+        f'POST /ipp/print HTTP/1.1\r\n'
+        f'Host: {host}:{port}\r\n'
+        f'Content-Type: application/ipp\r\n'
+        f'Content-Length: {len(ipp)}\r\n'
+        f'\r\n'
+    ).encode() + ipp
+
+    try:
+        with socket.create_connection((host, port), timeout=timeout) as s:
+            s.settimeout(timeout)
+            s.sendall(http)
+            data = b''
+            while len(data) < 8192:
+                try:
+                    chunk = s.recv(4096)
+                    if not chunk:
+                        break
+                    data += chunk
+                except socket.timeout:
+                    break
+            # Find printer-make-and-model in the IPP response
+            marker = b'printer-make-and-model'
+            idx = data.find(marker)
+            if idx >= 0:
+                # Skip tag(1) + name-length(2) + name + value-length(2)
+                pos = idx + len(marker)
+                if pos + 2 <= len(data):
+                    vlen = struct.unpack('>H', data[pos:pos + 2])[0]
+                    if pos + 2 + vlen <= len(data):
+                        return data[pos + 2:pos + 2 + vlen].decode('utf-8', errors='replace').strip()
+    except (socket.gaierror, socket.timeout, OSError):
+        pass
+    return ''
+
+
+def _detect_printer_model(uri: str) -> dict:
+    """Detect printer model from its URI using PJL, SNMP, and IPP."""
+    from urllib.parse import urlparse
+    result = {'model': '', 'method': '', 'uri': uri}
+
+    if not uri:
+        return result
+
+    # Extract host from URI
+    if uri.startswith('socket://'):
+        p = urlparse(uri)
+        host = p.hostname or ''
+        port = p.port or 9100
+        if host:
+            # Try PJL first (most reliable for JetDirect)
+            model = _detect_pjl(host, port)
+            if model:
+                result['model'] = model
+                result['method'] = 'pjl'
+                return result
+            # Try SNMP
+            model = _detect_snmp(host)
+            if model:
+                result['model'] = model
+                result['method'] = 'snmp'
+                return result
+            # Try IPP (some printers also run IPP)
+            model = _detect_ipp(host)
+            if model:
+                result['model'] = model
+                result['method'] = 'ipp'
+                return result
+    elif uri.startswith(('ipp://', 'ipps://', 'http://', 'https://')):
+        p = urlparse(uri.replace('ipp://', 'http://').replace('ipps://', 'https://'))
+        host = p.hostname or ''
+        port = p.port or 631
+        if host:
+            model = _detect_ipp(host, port)
+            if model:
+                result['model'] = model
+                result['method'] = 'ipp'
+                return result
+            model = _detect_snmp(host)
+            if model:
+                result['model'] = model
+                result['method'] = 'snmp'
+                return result
+    elif uri.startswith('lpd://'):
+        p = urlparse(uri)
+        host = p.hostname or ''
+        if host:
+            model = _detect_snmp(host)
+            if model:
+                result['model'] = model
+                result['method'] = 'snmp'
+                return result
+
+    return result
+
+
+@routes.get(config.URL_PREFIX + 'api/admin/printers/detect')
+async def api_admin_detect_printer(request):
+    """Detect printer model from a device URI or host address."""
+    _require_admin(request)
+    uri = request.query.get('uri', '').strip()
+    host = request.query.get('host', '').strip()
+    # If bare host given (no scheme), try socket:// first
+    if host and not uri:
+        uri = f'socket://{host}:9100'
+    if not uri:
+        return web.json_response({'status': 'error', 'msg': 'Provide ?uri= or ?host='}, status=400)
+    result = _detect_printer_model(uri)
+    # If socket:// detection failed and bare host was given, also try SNMP/IPP directly
+    if not result['model'] and host:
+        model = _detect_snmp(host)
+        if model:
+            result['model'] = model
+            result['method'] = 'snmp'
+        else:
+            model = _detect_ipp(host)
+            if model:
+                result['model'] = model
+                result['method'] = 'ipp'
+    result['status'] = 'ok' if result['model'] else 'not_detected'
+    return web.json_response(result)
+
+
 @routes.get(config.URL_PREFIX + 'api/admin/printers')
 async def api_admin_list_printers(request):
     _require_admin(request)
@@ -1053,6 +1313,12 @@ async def api_admin_ping_printer(request):
     if not uri:
         return web.json_response({'status': 'error', 'msg': 'printer not found'}, status=404)
     result = _printer_uri_reachable(uri)
+    # Also detect model if reachable
+    if result.get('reachable'):
+        detection = _detect_printer_model(uri)
+        if detection.get('model'):
+            result['model'] = detection['model']
+            result['detection_method'] = detection['method']
     return web.json_response({'status': 'ok', 'uri': uri, **result})
 
 
