@@ -482,10 +482,10 @@ interface SettingEntry {
 
         <!-- Add Printer Wizard -->
         @if (showAddPrinterWizard) {
-          <div class="modal fade show d-block" style="background:rgba(0,0,0,0.5);z-index:10001">
-            <div class="modal-dialog modal-lg">
+          <div class="modal fade show d-block" style="background:rgba(0,0,0,0.5);z-index:10001" (keydown.enter)="onWizardEnter($event)">
+            <div class="modal-dialog modal-lg" [style.transform]="wizardDragTransform" style="transition:none">
               <div class="modal-content">
-                <div class="modal-header py-2">
+                <div class="modal-header py-2" style="cursor:move" (mousedown)="onDragStart($event, 'wizard')">
                   <h6 class="modal-title">
                     <fa-icon [icon]="faPlus" class="me-2" /> Add Printer — Step {{ wizardStep === 'connection' ? '1' : wizardStep === 'device' ? '2' : wizardStep === 'details' ? '3' : '4' }} of 4
                   </h6>
@@ -723,17 +723,27 @@ interface SettingEntry {
                     }
                   }
                 </div>
-                <div class="modal-footer py-1">
-                  @if (wizardStep !== 'connection') {
-                    <button class="btn btn-sm btn-outline-secondary" (click)="wizardBack()">Back</button>
+                <div class="modal-footer py-1 flex-wrap">
+                  @if (wizardStatusMsg) {
+                    <div class="w-100 mb-1">
+                      <div class="alert py-1 px-2 mb-0 small d-flex align-items-center" [class.alert-info]="wizardStatusType === 'progress'" [class.alert-success]="wizardStatusType === 'success'" [class.alert-danger]="wizardStatusType === 'error'">
+                        @if (wizardStatusType === 'progress') { <span class="spinner-border spinner-border-sm me-2"></span> }
+                        {{ wizardStatusMsg }}
+                      </div>
+                    </div>
                   }
-                  @if (wizardStep !== 'driver') {
-                    <button class="btn btn-sm btn-primary" (click)="wizardNext()" [disabled]="!wizardCanAdvance()">Next</button>
-                  } @else {
-                    <button class="btn btn-sm btn-success" (click)="submitAddPrinter()" [disabled]="!newPrinterName || printersBusy">
-                      <fa-icon [icon]="faPlus" class="me-1" />@if (wizardDriverMode !== 'skip' && wizardDriverMode !== 'find' || wizardDriverAccepted) { Create & Install Driver } @else { Create }
-                    </button>
-                  }
+                  <div class="d-flex gap-2">
+                    @if (wizardStep !== 'connection') {
+                      <button class="btn btn-sm btn-outline-secondary" (click)="wizardBack()" [disabled]="printersBusy">Back</button>
+                    }
+                    @if (wizardStep !== 'driver') {
+                      <button class="btn btn-sm btn-primary" (click)="wizardNext()" [disabled]="!wizardCanAdvance()">Next</button>
+                    } @else {
+                      <button class="btn btn-sm btn-success" (click)="submitAddPrinter()" [disabled]="!newPrinterName || printersBusy">
+                        <fa-icon [icon]="faPlus" class="me-1" />@if (wizardDriverMode !== 'skip' && wizardDriverMode !== 'find' || wizardDriverAccepted) { Create & Install Driver } @else { Create }
+                      </button>
+                    }
+                  </div>
                 </div>
               </div>
             </div>
@@ -743,9 +753,9 @@ interface SettingEntry {
         <!-- Modify Printer Modal -->
         @if (showModifyPrinter) {
           <div class="modal fade show d-block" style="background:rgba(0,0,0,0.5);z-index:10001">
-            <div class="modal-dialog">
+            <div class="modal-dialog" [style.transform]="modifyDragTransform" style="transition:none">
               <div class="modal-content">
-                <div class="modal-header py-2">
+                <div class="modal-header py-2" style="cursor:move" (mousedown)="onDragStart($event, 'modify')">
                   <h6 class="modal-title">
                     <fa-icon [icon]="faPenToSquare" class="me-2" /> Modify "{{ modifyName }}"
                   </h6>
@@ -1275,6 +1285,17 @@ export class AdminPanelComponent implements OnInit {
   wizardDetectedModel = '';
   wizardDetectedMfr = '';
   wizardDriverAccepted = false;
+  // Wizard progress/status
+  wizardStatusMsg = '';
+  wizardStatusType: 'progress' | 'success' | 'error' = 'progress';
+  // Draggable modal state
+  wizardDragTransform = '';
+  modifyDragTransform = '';
+  private _dragTarget: 'wizard' | 'modify' | null = null;
+  private _dragStartX = 0;
+  private _dragStartY = 0;
+  private _dragOffsetX = 0;
+  private _dragOffsetY = 0;
   // Modify state
   showModifyPrinter = false;
   modifyName = '';
@@ -1885,6 +1906,7 @@ export class AdminPanelComponent implements OnInit {
     this.modifyDriverUploadResult = '';
     this.modifyDriverInstalling = false;
     this.modifyDriverInstallResult = '';
+    this.modifyDragTransform = '';
     this.showModifyPrinter = true;
     // Load installed drivers for the dropdown
     this.http.get<{ drivers: string[] }>('api/admin/printers/drivers/installed').subscribe({
@@ -1941,6 +1963,10 @@ export class AdminPanelComponent implements OnInit {
     this.wizardDetectedMfr = '';
     this.wizardSelectedInstalledDriver = '';
     this.wizardDriverAccepted = false;
+    this.wizardStatusMsg = '';
+    this.wizardDragTransform = '';
+    this._dragOffsetX = 0;
+    this._dragOffsetY = 0;
     if (this.wizardDrivers.length === 0) {
       this.wizardDriversLoading = true;
       this.http.get<{ drivers: { ppd: string; description: string }[] }>('api/admin/printers/drivers').subscribe({
@@ -2117,10 +2143,11 @@ export class AdminPanelComponent implements OnInit {
   submitAddPrinter() {
     const uri = this.finalWizardUri();
     if (!uri || uri.startsWith('(')) {
-      this.showPrintersStatus('Invalid URI.', true);
+      this.setWizardStatus('Invalid URI.', 'error');
       return;
     }
     this.printersBusy = true;
+    this.setWizardStatus('Creating printer\u2026', 'progress');
     this.http.post<{ status: string; msg: string }>('api/admin/printers', {
       name: this.newPrinterName,
       uri,
@@ -2130,19 +2157,31 @@ export class AdminPanelComponent implements OnInit {
     }).subscribe({
       next: (res) => {
         if (res.status === 'ok') {
+          const driverMode = this.wizardDriverMode;
+          if (driverMode !== 'skip' && !(driverMode === 'find' && !this.wizardDriverAccepted)) {
+            this.setWizardStatus('Printer created. Installing Windows driver\u2026 (this may take a few minutes)', 'progress');
+          } else {
+            this.setWizardStatus('Printer created. Finishing\u2026', 'progress');
+          }
           // Now install driver if requested
           this.installDriverForPrinter(this.newPrinterName, 'wizard', () => {
             this.printersBusy = false;
-            this.showAddPrinterWizard = false;
-            this.showPrintersStatus('Printer added.');
+            this.setWizardStatus('Done! Printer added successfully.', 'success');
+            setTimeout(() => {
+              this.showAddPrinterWizard = false;
+              this.wizardStatusMsg = '';
+            }, 1500);
             this.loadPrinters();
           });
         } else {
           this.printersBusy = false;
-          this.showPrintersStatus(res.msg, true);
+          this.setWizardStatus(res.msg || 'Failed to create printer.', 'error');
         }
       },
-      error: (err: any) => { this.printersBusy = false; this.showPrintersStatus(err?.error?.msg || 'Error.', true); },
+      error: (err: any) => {
+        this.printersBusy = false;
+        this.setWizardStatus(err?.error?.msg || 'Error creating printer.', 'error');
+      },
     });
   }
 
@@ -2179,14 +2218,17 @@ export class AdminPanelComponent implements OnInit {
     this.http.post<any>(`api/admin/printers/${encodeURIComponent(printerName)}/install-driver`, body).subscribe({
       next: (res) => {
         if (res.status === 'ok') {
-          this.showPrintersStatus(`Driver installed: ${res.driver_name || 'ok'}`);
+          if (ctx === 'wizard') this.setWizardStatus(`Driver installed: ${res.driver_name || 'ok'}`, 'success');
+          else this.showPrintersStatus(`Driver installed: ${res.driver_name || 'ok'}`);
         } else {
-          this.showPrintersStatus(`Printer created but driver failed: ${res.msg}`, true);
+          if (ctx === 'wizard') this.setWizardStatus(`Printer created but driver failed: ${res.msg}`, 'error');
+          else this.showPrintersStatus(`Printer created but driver failed: ${res.msg}`, true);
         }
         onDone();
       },
       error: (err: any) => {
-        this.showPrintersStatus(`Printer created but driver error: ${err?.error?.msg || 'failed'}`, true);
+        if (ctx === 'wizard') this.setWizardStatus(`Printer created but driver error: ${err?.error?.msg || 'failed'}`, 'error');
+        else this.showPrintersStatus(`Printer created but driver error: ${err?.error?.msg || 'failed'}`, true);
         onDone();
       },
     });
@@ -2243,6 +2285,48 @@ export class AdminPanelComponent implements OnInit {
   private showPrintersStatus(msg: string, isError = false) {
     this.printersStatusMsg = msg; this.printersStatusErr = isError;
     setTimeout(() => { this.printersStatusMsg = ''; }, 4000);
+  }
+
+  private setWizardStatus(msg: string, type: 'progress' | 'success' | 'error') {
+    this.wizardStatusMsg = msg;
+    this.wizardStatusType = type;
+    if (type !== 'progress') {
+      setTimeout(() => { this.wizardStatusMsg = ''; }, type === 'success' ? 3000 : 8000);
+    }
+  }
+
+  // --- Draggable modal ---
+  onDragStart(event: MouseEvent, target: 'wizard' | 'modify') {
+    if ((event.target as HTMLElement).closest('button')) return; // don't drag when clicking buttons
+    this._dragTarget = target;
+    this._dragStartX = event.clientX - this._dragOffsetX;
+    this._dragStartY = event.clientY - this._dragOffsetY;
+    const onMove = (e: MouseEvent) => {
+      this._dragOffsetX = e.clientX - this._dragStartX;
+      this._dragOffsetY = e.clientY - this._dragStartY;
+      const t = `translate(${this._dragOffsetX}px, ${this._dragOffsetY}px)`;
+      if (this._dragTarget === 'wizard') this.wizardDragTransform = t;
+      else this.modifyDragTransform = t;
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      this._dragTarget = null;
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    event.preventDefault();
+  }
+
+  // --- Enter key advances wizard ---
+  onWizardEnter(event: Event) {
+    const target = event.target as HTMLElement;
+    if (target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+    if (this.wizardStep !== 'driver' && this.wizardCanAdvance()) {
+      this.wizardNext();
+    } else if (this.wizardStep === 'driver' && this.newPrinterName && !this.printersBusy) {
+      this.submitAddPrinter();
+    }
   }
 
   openAdminStats() {
