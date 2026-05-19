@@ -58,6 +58,137 @@ def _run(cmd: list[str], timeout: int = 120) -> tuple[int, str, str]:
         return 124, '', 'timeout'
 
 
+def _check_url_exists(url: str, timeout: int = 10) -> tuple[bool, int]:
+    """HEAD-check a URL. Returns (exists, content_length)."""
+    rc, out, _ = _run(['curl', '-sfIL', '--connect-timeout', '5',
+                       '--max-time', str(timeout), url], timeout=timeout + 5)
+    if rc != 0:
+        return False, 0
+    # Parse content-length from headers
+    size = 0
+    status_ok = False
+    for line in out.splitlines():
+        lower = line.lower()
+        if lower.startswith('http/') and ' 200' in line:
+            status_ok = True
+        if lower.startswith('content-length:'):
+            try:
+                size = int(line.split(':', 1)[1].strip())
+            except ValueError:
+                pass
+    return status_ok, size
+
+
+def find_driver_url(manufacturer: str = 'HP', driver_type: str = 'pcl6') -> dict:
+    """Probe known download URL patterns to find a working driver download.
+
+    Tries multiple HP FTP path patterns and version numbers, returns
+    the first working URL with its file size.
+
+    Returns:
+        dict with keys: url, version, size_mb, status
+    """
+    if manufacturer.upper() != 'HP':
+        return {'status': 'not_found', 'msg': f'Auto-find not supported for {manufacturer}'}
+
+    drv_type = 'pcl6' if 'pcl' in driver_type.lower() else 'ps'
+
+    # HP UPD URL patterns known to work across different HP CDN reorganizations
+    # Pattern 1: Direct /printers/UPD/ path (legacy, sometimes works)
+    # Pattern 2: /COL40842/ path (sometimes used for specific releases)
+    # Pattern 3: Numbered build paths
+    url_templates = [
+        'https://ftp.hp.com/pub/softlib/software13/printers/UPD/upd-{type}-x64-{ver}.exe',
+        'https://ftp.hp.com/pub/softpaq/sp{spbase}-{spend}/upd-{type}-x64-{ver}.exe',
+        'https://ftp.hp.com/pub/softlib/software13/COL40842/bi-{bi}-{bv}/upd-{type}-x64-{ver}.exe',
+    ]
+
+    # Known/recent version numbers to probe (newest first)
+    versions = [
+        '7.4.0.26070', '7.4.0.26060', '7.4.0.26050',
+        '7.3.0.26000', '7.3.0.25990', '7.3.0.25980', '7.3.0.25970',
+        '7.3.0.25960', '7.3.0.25950', '7.3.0.25940', '7.3.0.25930',
+        '7.3.0.25920', '7.3.0.25919', '7.3.0.25910', '7.3.0.25900',
+        '7.2.0.25780', '7.2.0.25770', '7.2.0.25760',
+        '7.1.0.25500', '7.1.0.25480',
+        '7.0.1.24923', '7.0.0.24832',
+    ]
+
+    # Softpaq ranges to try (HP uses sp{number}/{filename})
+    sp_ranges = [
+        (155000, 155999), (152000, 152999), (150000, 150999),
+        (148000, 148999), (145000, 145999), (143000, 143999),
+    ]
+
+    # Build-id patterns for the COL40842 path
+    bi_variants = [
+        ('237399', '2'), ('237399', '1'),
+        ('148498', '11'), ('148498', '12'),
+        ('148498', '10'), ('148498', '9'),
+    ]
+
+    log.info(f'Searching for HP UPD {drv_type} x64 download URL...')
+
+    # Strategy 1: Try direct /printers/UPD/ paths (fast — just version iteration)
+    template = url_templates[0]
+    for ver in versions:
+        url = template.format(type=drv_type, ver=ver)
+        exists, size = _check_url_exists(url)
+        if exists and size > 1_000_000:  # Must be > 1MB to be a real driver
+            log.info(f'Found working URL: {url} ({size / 1048576:.1f} MB)')
+            return {
+                'status': 'found',
+                'url': url,
+                'version': ver,
+                'size_mb': round(size / 1048576, 1),
+                'driver_type': drv_type,
+                'driver_name': HP_UPD_PCL6_DRIVER_NAME if drv_type == 'pcl6' else HP_UPD_PS_DRIVER_NAME,
+            }
+
+    # Strategy 2: Try COL40842/bi-xxx paths
+    template = url_templates[2]
+    for bi, bv in bi_variants:
+        for ver in versions[:8]:  # Only try recent versions
+            url = template.format(type=drv_type, ver=ver, bi=bi, bv=bv)
+            exists, size = _check_url_exists(url)
+            if exists and size > 1_000_000:
+                log.info(f'Found working URL: {url} ({size / 1048576:.1f} MB)')
+                return {
+                    'status': 'found',
+                    'url': url,
+                    'version': ver,
+                    'size_mb': round(size / 1048576, 1),
+                    'driver_type': drv_type,
+                    'driver_name': HP_UPD_PCL6_DRIVER_NAME if drv_type == 'pcl6' else HP_UPD_PS_DRIVER_NAME,
+                }
+
+    # Strategy 3: Try softpaq paths (slower — more combinations)
+    template = url_templates[1]
+    for sp_start, sp_end in sp_ranges:
+        for sp in range(sp_end, sp_start - 1, -100):  # Sample every 100
+            for ver in versions[:5]:  # Only newest
+                url = template.format(type=drv_type, ver=ver,
+                                      spbase=f'{sp_start:06d}', spend=f'{sp_end:06d}')
+                exists, size = _check_url_exists(url)
+                if exists and size > 1_000_000:
+                    log.info(f'Found working URL: {url} ({size / 1048576:.1f} MB)')
+                    return {
+                        'status': 'found',
+                        'url': url,
+                        'version': ver,
+                        'size_mb': round(size / 1048576, 1),
+                        'driver_type': drv_type,
+                        'driver_name': HP_UPD_PCL6_DRIVER_NAME if drv_type == 'pcl6' else HP_UPD_PS_DRIVER_NAME,
+                    }
+
+    log.warning('Could not find a working HP UPD download URL')
+    return {
+        'status': 'not_found',
+        'msg': 'Could not find a working download URL. Try downloading manually from https://support.hp.com/drivers/hp-universal-print-driver-for-windows/503548 and provide the URL.',
+        'manual_page': 'https://support.hp.com/us-en/drivers/hp-universal-print-driver-for-windows/503548',
+    }
+
+
 def download_file(url: str, dest_path: str, timeout: int = 300) -> bool:
     """Download a file from URL to dest_path using curl."""
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
@@ -313,14 +444,13 @@ def set_printer_driver(printer_name: str, driver_name: str) -> tuple[bool, str]:
 
 def suggest_driver_for_model(model: str) -> dict:
     """Suggest a Windows driver package based on detected printer model."""
-    model_lower = model.lower()
-
     if _HP_MODELS.search(model):
         return {
             'manufacturer': 'HP',
             'driver_name': HP_UPD_PCL6_DRIVER_NAME,
             'driver_type': 'PCL 6',
             'url': HP_UPD_PCL6_URL,
+            'find_url_hint': 'Use GET /api/admin/printers/drivers/find to locate a working download URL',
             'description': 'HP Universal Print Driver PCL 6 (x64) — works with all HP printers',
         }
 
@@ -392,10 +522,20 @@ def install_driver_for_printer(printer_name: str, model: str = '',
     # Determine driver to use
     if not url or not driver_name:
         suggestion = suggest_driver_for_model(model)
-        if not suggestion.get('url'):
+        if not suggestion.get('url') and not suggestion.get('manufacturer'):
             return {'status': 'error', 'msg': 'No driver available for this model.'}
-        url = url or suggestion['url']
-        driver_name = driver_name or suggestion['driver_name']
+        url = url or suggestion.get('url', '')
+        driver_name = driver_name or suggestion.get('driver_name', '')
+
+    # If the URL looks like the hardcoded one, try find_driver_url first to get a working one
+    if not url or 'ftp.hp.com' in url:
+        found = find_driver_url(manufacturer='HP', driver_type='pcl6')
+        if found.get('status') == 'found':
+            url = found['url']
+            driver_name = driver_name or found.get('driver_name', HP_UPD_PCL6_DRIVER_NAME)
+        elif not url:
+            return {'status': 'error', 'msg': 'Could not find a working driver download URL.',
+                    'find_result': found}
 
     # Check if already installed
     if is_driver_installed(driver_name):

@@ -1305,6 +1305,21 @@ async def api_admin_installed_drivers(request):
     return web.json_response({'status': 'ok', 'drivers': drivers})
 
 
+@routes.get(config.URL_PREFIX + 'api/admin/printers/drivers/find')
+async def api_admin_find_driver(request):
+    """Probe HP FTP/CDN for a working driver download URL.
+
+    Query params:
+        manufacturer (default: HP)
+        type (default: pcl6, also: ps)
+    """
+    _require_admin(request)
+    manufacturer = request.query.get('manufacturer', 'HP')
+    drv_type = request.query.get('type', 'pcl6')
+    result = driver_manager.find_driver_url(manufacturer=manufacturer, driver_type=drv_type)
+    return web.json_response(result)
+
+
 @routes.get(config.URL_PREFIX + 'api/admin/printers')
 async def api_admin_list_printers(request):
     _require_admin(request)
