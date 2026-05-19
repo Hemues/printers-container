@@ -575,6 +575,7 @@ REM No registry changes required. Capabilities (duplex/color/paper) auto-detecte
 
 set "PRINTER_NAME=${PNAME} (${PRIMARY_ADDR})"
 set "IPP_URL=http://${PRIMARY_ADDR}:631/printers/${PNAME}"
+set "SERVER_HOST=${PRIMARY_ADDR}"
 
 REM Check if printer is already installed
 powershell -NoProfile -Command "if (Get-Printer -Name '%PRINTER_NAME%' -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
@@ -602,7 +603,7 @@ echo.
 
 REM Try to install - needs elevation
 powershell -NoProfile -Command ^
-  "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile -ExecutionPolicy Bypass -Command ""rundll32.exe printui.dll,PrintUIEntry /if /b \\\"%PRINTER_NAME%\\\" /r \\\"%IPP_URL%\\\" /m \\\"Microsoft IPP Class Driver\\\"; Start-Sleep 2; if (Get-Printer -Name \\\"%PRINTER_NAME%\\\" -ErrorAction SilentlyContinue) { Write-Host \\\"[OK] Printer installed!\\\" -Fore Green } else { Write-Host \\\"[TRYING FALLBACK]\\\" -Fore Yellow; Add-PrinterPort -Name \\\"%IPP_URL%\\\" -PrinterHostAddress \\\"%PRIMARY_ADDR%\\\" -PortNumber 631 -ErrorAction SilentlyContinue; Add-Printer -Name \\\"%PRINTER_NAME%\\\" -DriverName \\\"Microsoft IPP Class Driver\\\" -PortName \\\"%IPP_URL%\\\" }""'"
+  "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile -ExecutionPolicy Bypass -Command ""rundll32.exe printui.dll,PrintUIEntry /if /b \\\"%PRINTER_NAME%\\\" /r \\\"%IPP_URL%\\\" /m \\\"Microsoft IPP Class Driver\\\"; Start-Sleep 2; if (Get-Printer -Name \\\"%PRINTER_NAME%\\\" -ErrorAction SilentlyContinue) { Write-Host \\\"[OK] Printer installed!\\\" -Fore Green } else { Write-Host \\\"[TRYING FALLBACK]\\\" -Fore Yellow; Add-PrinterPort -Name \\\"%IPP_URL%\\\" -PrinterHostAddress \\\"%SERVER_HOST%\\\" -PortNumber 631 -ErrorAction SilentlyContinue; Add-Printer -Name \\\"%PRINTER_NAME%\\\" -DriverName \\\"Microsoft IPP Class Driver\\\" -PortName \\\"%IPP_URL%\\\" }""'"
 
 REM Verify installation
 timeout /t 2 /nobreak >nul
