@@ -72,6 +72,21 @@ seed_config /opt/templates/cups-pdf.conf.template   "$CONFIG_DIR/cups/cups-pdf.c
 cp -f /opt/templates/cupsd.conf.template "$CONFIG_DIR/cups/cupsd.conf.template"
 cp -f /opt/templates/cups-pdf.conf.template "$CONFIG_DIR/cups/cups-pdf.conf.template"
 
+# Rootless podman: non-root users cannot load shared libraries from overlay
+# layers (fuse-overlayfs uid mapping limitation). Force CUPS to run filters
+# and backends as root (safe: "root" inside rootless container = unprivileged
+# host user "printers").
+CUPS_FILES="$CONFIG_DIR/cups/cups-files.conf"
+if [ -f "$CUPS_FILES" ]; then
+    grep -q '^User root' "$CUPS_FILES" || {
+        sed -i '/^#.*User /d; /^User /d' "$CUPS_FILES"
+        sed -i '/^#.*Group /d; /^Group /d' "$CUPS_FILES"
+        echo "User root" >> "$CUPS_FILES"
+        echo "Group root" >> "$CUPS_FILES"
+        echo "[entrypoint] patched cups-files.conf: User root, Group root (rootless podman fix)"
+    }
+fi
+
 # Samba config
 seed_config /etc/samba/smb.conf.template "$CONFIG_DIR/samba/smb.conf"
 ln -sfn "$CONFIG_DIR/samba/smb.conf" /etc/samba/smb.conf

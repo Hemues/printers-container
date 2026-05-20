@@ -665,7 +665,7 @@ if !errorlevel! equ 0 (
     echo   Printer "!PRINTER_NAME!" is already installed.
     echo   Opening print queue...
     echo.
-    rundll32 printui.dll,PrintUIEntry /o /n "!PRINTER_NAME!"
+    start "" rundll32 printui.dll,PrintUIEntry /o /n "!PRINTER_NAME!"
     goto :end
 )
 
@@ -695,7 +695,7 @@ if !errorlevel! equ 0 (
     echo.
     echo   [OK] Printer installed successfully!
     echo   Opening print queue...
-    rundll32 printui.dll,PrintUIEntry /o /n "!PRINTER_NAME!"
+    start "" rundll32 printui.dll,PrintUIEntry /o /n "!PRINTER_NAME!"
 ) else (
     echo.
     echo   [!] Automated install may have failed.
